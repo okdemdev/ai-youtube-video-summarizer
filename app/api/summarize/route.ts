@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { extractVideoId, urlSchema } from '@/lib/utils';
-import { downloadAudio, transcribeAudio } from '@/lib/youtube';
+import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube';
 import { generateSummary } from '@/lib/ai';
 
 export async function POST(request: Request) {
@@ -15,6 +15,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
+    console.log('Fetching video metadata...');
+    const metadata = await getVideoMetadata(videoId);
+
     console.log('Downloading audio...');
     const audioPath = await downloadAudio(videoId);
 
@@ -22,7 +25,7 @@ export async function POST(request: Request) {
     const transcription = await transcribeAudio(audioPath);
 
     console.log('Generating summary...');
-    const summary = await generateSummary(transcription);
+    const summary = await generateSummary(transcription, metadata);
 
     return NextResponse.json({ summary });
   } catch (error: unknown) {

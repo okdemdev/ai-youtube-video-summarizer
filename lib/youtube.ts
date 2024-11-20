@@ -4,10 +4,17 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { google } from 'googleapis';
 
 const execAsync = promisify(exec);
 const speechClient = new SpeechClient();
 const MAX_CHUNK_DURATION = 45; // seconds
+const youtube = google.youtube('v3');
+
+export interface VideoMetadata {
+  title: string;
+  description: string;
+}
 
 export async function downloadAudio(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
@@ -72,5 +79,28 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
       fs.unlinkSync(audioPath);
     }
     throw new Error('Failed to transcribe audio');
+  }
+}
+
+export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> {
+  try {
+    const response = await youtube.videos.list({
+      key: process.env.YOUTUBE_API_KEY,
+      id: [videoId],
+      part: ['snippet'],
+    });
+
+    const video = response.data.items?.[0];
+    if (!video) {
+      throw new Error('Video not found');
+    }
+
+    return {
+      title: video.snippet?.title || '',
+      description: video.snippet?.description || '',
+    };
+  } catch (error) {
+    console.error('Error fetching video metadata:', error);
+    throw new Error('Failed to fetch video metadata');
   }
 }
