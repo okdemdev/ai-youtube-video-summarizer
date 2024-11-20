@@ -27,7 +27,11 @@ export async function POST(request: Request) {
     console.log('Generating summary...');
     const summary = await generateSummary(transcription, metadata);
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({ 
+      summary, 
+      metadata,
+      transcript: transcription
+    });
   } catch (error: unknown) {
     if (error instanceof Error) {
       console.error('Error processing video:', {

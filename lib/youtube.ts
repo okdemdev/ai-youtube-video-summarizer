@@ -14,6 +14,11 @@ const youtube = google.youtube('v3');
 export interface VideoMetadata {
   title: string;
   description: string;
+  thumbnailUrl: string;
+  duration: string;
+  viewCount: string;
+  channelTitle: string;
+  publishedAt: string;
 }
 
 export async function downloadAudio(videoId: string): Promise<string> {
@@ -87,7 +92,7 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
     const response = await youtube.videos.list({
       key: process.env.YOUTUBE_API_KEY,
       id: [videoId],
-      part: ['snippet'],
+      part: ['snippet', 'contentDetails', 'statistics'],
     });
 
     const video = response.data.items?.[0];
@@ -95,9 +100,24 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
       throw new Error('Video not found');
     }
 
+    // Convert duration from ISO 8601 to readable format
+    const duration = video.contentDetails?.duration || '';
+    const readableDuration = duration
+      .replace('PT', '')
+      .replace('H', 'h ')
+      .replace('M', 'm ')
+      .replace('S', 's');
+
     return {
       title: video.snippet?.title || '',
       description: video.snippet?.description || '',
+      thumbnailUrl: video.snippet?.thumbnails?.maxres?.url || 
+                   video.snippet?.thumbnails?.high?.url ||
+                   video.snippet?.thumbnails?.medium?.url || '',
+      duration: readableDuration,
+      viewCount: video.statistics?.viewCount || '0',
+      channelTitle: video.snippet?.channelTitle || '',
+      publishedAt: new Date(video.snippet?.publishedAt || '').toLocaleDateString(),
     };
   } catch (error) {
     console.error('Error fetching video metadata:', error);
