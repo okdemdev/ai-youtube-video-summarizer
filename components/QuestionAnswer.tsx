@@ -111,7 +111,7 @@ export default function QuestionAnswer({ transcript, summary, metadata }: Questi
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask any question about the video content..."
-            className="w-full p-4 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+            className="w-full p-4 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none text-[16px]"
             rows={3}
             disabled={loading}
           />

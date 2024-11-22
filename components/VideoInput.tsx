@@ -74,7 +74,7 @@ export default function VideoInput({ onSubmit, loading, videoTitle }: VideoInput
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste YouTube video URL here..."
-          className="w-full pl-12 pr-[100px] sm:pr-32 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-sm sm:text-base"
+          className="w-full pl-12 pr-[100px] sm:pr-32 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-[16px]"
           disabled={loading}
         />
         <button
