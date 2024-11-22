@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "postinstall": "mkdir -p .next/server/bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o .next/server/bin/yt-dlp && chmod +x .next/server/bin/yt-dlp"
+    "start": "next start"
   },
   "dependencies": {
     "@google-cloud/speech": "^6.7.0",
@@ -22,8 +21,6 @@
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
-    "yt-dlp-exec": "^1.0.2",
-    "yt-dlp-wrap": "^2.3.12",
     "ytdl-core": "^4.11.5",
     "zod": "^3.22.4"
   },
