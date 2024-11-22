@@ -12,6 +12,7 @@ const MAX_CHUNK_DURATION = 45; // seconds
 const youtube = google.youtube('v3');
 
 export interface VideoMetadata {
+  videoId: string;
   title: string;
   description: string;
   thumbnailUrl: string;
@@ -23,12 +24,12 @@ export interface VideoMetadata {
 
 export async function downloadAudio(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
-  
+
   try {
     // Download as WAV format with specific sampling rate and mono channel
     const command = `yt-dlp -x --audio-format wav --audio-quality 0 --postprocessor-args "-ar 16000 -ac 1" -o "${outputPath}" https://www.youtube.com/watch?v=${videoId}`;
     await execAsync(command);
-    
+
     return outputPath;
   } catch (error) {
     console.error('Error downloading audio:', error);
@@ -39,11 +40,11 @@ export async function downloadAudio(videoId: string): Promise<string> {
 export async function transcribeAudio(audioPath: string): Promise<string> {
   try {
     const config = {
-      encoding: 'LINEAR16',
+      encoding: 'LINEAR16' as const,
       sampleRateHertz: 16000,
       languageCode: 'en-US',
     };
-    
+
     const audio = fs.readFileSync(audioPath);
     const audioLength = audio.length;
     const chunkSize = MAX_CHUNK_DURATION * 16000 * 2; // 2 bytes per sample
@@ -64,7 +65,7 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
 
       return speechClient.recognize(request).then(([response]) => {
         const transcription = response.results
-          ?.map(result => result.alternatives?.[0]?.transcript)
+          ?.map((result) => result.alternatives?.[0]?.transcript)
           .join('\n');
 
         return transcription;
@@ -75,7 +76,7 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
     const transcription = transcriptions.join('\n');
 
     fs.unlinkSync(audioPath);
-    
+
     return transcription || '';
   } catch (error) {
     console.error('Error transcribing audio:', error);
@@ -109,11 +110,14 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
       .replace('S', 's');
 
     return {
+      videoId,
       title: video.snippet?.title || '',
       description: video.snippet?.description || '',
-      thumbnailUrl: video.snippet?.thumbnails?.maxres?.url || 
-                   video.snippet?.thumbnails?.high?.url ||
-                   video.snippet?.thumbnails?.medium?.url || '',
+      thumbnailUrl:
+        video.snippet?.thumbnails?.maxres?.url ||
+        video.snippet?.thumbnails?.high?.url ||
+        video.snippet?.thumbnails?.medium?.url ||
+        '',
       duration: readableDuration,
       viewCount: video.statistics?.viewCount || '0',
       channelTitle: video.snippet?.channelTitle || '',
