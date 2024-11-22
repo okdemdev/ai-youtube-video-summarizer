@@ -27,21 +27,13 @@ export async function POST(request: Request) {
     console.log('Generating summary...');
     const summary = await generateSummary(transcription, metadata);
 
-    return NextResponse.json({ 
-      summary, 
+    return NextResponse.json({
+      summary,
       metadata,
-      transcript: transcription
+      transcript: transcription,
     });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error processing video:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    } else {
-      console.error('Unknown error:', error);
-    }
+    console.error('Error processing video:', error);
     return NextResponse.json({ error: 'Failed to process video' }, { status: 500 });
   }
 }
