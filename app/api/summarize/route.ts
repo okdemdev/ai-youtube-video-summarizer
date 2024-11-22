@@ -3,9 +3,16 @@ import { extractVideoId, urlSchema } from '@/lib/utils';
 import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube';
 import { generateSummary } from '@/lib/ai';
 
-export async function POST(request: Request) {
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
+  if (req.method !== 'POST') {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
   try {
-    const { url } = await request.json();
+    const { url } = await req.json();
     console.log('Received URL:', url);
 
     const validUrl = urlSchema.parse(url);

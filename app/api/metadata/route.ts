@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getVideoMetadata } from '@/lib/youtube';
 
-export async function POST(request: Request) {
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
+  if (req.method !== 'POST') {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
   try {
-    const { videoId } = await request.json();
+    const { videoId } = await req.json();
 
     if (!videoId) {
       return NextResponse.json({ error: 'Video ID is required' }, { status: 400 });
