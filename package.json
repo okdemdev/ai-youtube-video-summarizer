@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "if not exist .next\\server\\bin mkdir .next\\server\\bin && powershell -Command \"(New-Object System.Net.WebClient).DownloadFile('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe', '.next\\server\\bin\\yt-dlp.exe'); if ($?) { Write-Host 'yt-dlp downloaded successfully' } else { Write-Host 'Failed to download yt-dlp' -ForegroundColor Red; exit 1 }\""
+    "postinstall": "mkdir -p .next/server/bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o .next/server/bin/yt-dlp && chmod +x .next/server/bin/yt-dlp"
   },
   "dependencies": {
     "@google-cloud/speech": "^6.7.0",
