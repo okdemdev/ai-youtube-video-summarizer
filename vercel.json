@@ -1,4 +1,0 @@
-{
-  "buildCommand": "pip install python && npm run build",
-  "installCommand": "npm install"
-}
