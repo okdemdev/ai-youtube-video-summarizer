@@ -101,11 +101,8 @@ export default function VideoInput({ onSubmit, loading, videoTitle }: VideoInput
 
       {loading && loadingMessage && (
         <div className="mt-8 flex flex-col items-center justify-center">
-          <div className="relative w-16 h-16 mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-lg font-medium text-gray-700 text-center animate-fade-in">
+          <div className="loading-spinner"></div>
+          <p className="mt-6 text-lg font-medium text-gray-700 text-center animate-fade-in">
             {loadingMessage}
           </p>
         </div>

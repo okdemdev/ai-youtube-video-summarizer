@@ -189,11 +189,62 @@ export default function Summary({ content, isLoading, metadata, transcript }: Su
       )}
 
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-bold mb-4">Summary</h2>
+        <h2 className="text-xl font-bold mb-6">Summary</h2>
         <div>
-          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{content}</p>
+          {content && (
+            <div className="space-y-6">
+              {content.split('\n\n').map((section, index) => {
+                // Check if this is a section header
+                if (
+                  section.includes('OVERVIEW') ||
+                  section.includes('MAIN TAKEAWAYS') ||
+                  section.includes('VALUABLE INSIGHTS') ||
+                  section.includes('NOTABLE MOMENTS')
+                ) {
+                  return (
+                    <div key={index} className="space-y-3">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {section.split('\n')[0]}
+                      </h3>
+                      <div className="pl-1">
+                        {section
+                          .split('\n')
+                          .slice(1)
+                          .map((line, i) => (
+                            <p key={i} className="text-gray-700 leading-relaxed">
+                              {line}
+                            </p>
+                          ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // For bullet points
+                if (section.includes('•')) {
+                  return (
+                    <div key={index} className="space-y-2 pl-1">
+                      {section.split('\n').map((line, i) => (
+                        <p key={i} className="text-gray-700 leading-relaxed flex items-start gap-2">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                }
+
+                // For regular paragraphs
+                return (
+                  <p key={index} className="text-gray-700 leading-relaxed">
+                    {section}
+                  </p>
+                );
+              })}
+            </div>
+          )}
+
           {isSaved && (
-            <div className="mt-4 p-4 bg-green-50 rounded-lg">
+            <div className="mt-6 p-4 bg-green-50 rounded-lg">
               <p className="text-sm text-green-600 flex items-center gap-2">
                 <BookmarkCheck className="w-5 h-5" />
                 This video and all its content are saved to your library

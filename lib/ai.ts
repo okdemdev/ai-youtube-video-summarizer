@@ -3,6 +3,35 @@ import { VideoMetadata } from './youtube';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+const EMOJI_MAP = {
+  overview: '📝',
+  key_points: '🎯',
+  insights: '💡',
+  highlights: '🎬',
+  tech: '💻',
+  business: '💼',
+  science: '🔬',
+  education: '📚',
+  entertainment: '🎭',
+  gaming: '🎮',
+  music: '🎵',
+  sports: '⚽',
+  news: '📰',
+  tutorial: '🎓',
+  review: '⭐',
+  analysis: '📊',
+  time: '⏱️',
+  money: '💰',
+  idea: '💭',
+  warning: '⚠️',
+  tip: '💡',
+  example: '📌',
+  quote: '💬',
+  link: '🔗',
+  code: '👨‍💻',
+  data: '📊',
+};
+
 export const generateSummary = async (
   transcript: string,
   metadata: VideoMetadata
@@ -10,40 +39,58 @@ export const generateSummary = async (
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    const prompt = `As an expert content summarizer, create a comprehensive yet engaging summary of this YouTube video.
+    const prompt = `Create an engaging, easy-to-read summary of this YouTube video. Format your response exactly as follows:
 
-Video Title: ${metadata.title}
+OVERVIEW
+Write a captivating 2-3 sentence introduction that hooks the reader and explains the video's main topic.
+
+MAIN TAKEAWAYS
+• ${EMOJI_MAP.idea} [Core concept/idea]
+• ${EMOJI_MAP.example} [Practical example/demonstration]
+• ${EMOJI_MAP.tip} [Actionable tip/advice]
+• ${EMOJI_MAP.warning} [Important consideration]
+(Add 3-5 key points)
+
+VALUABLE INSIGHTS
+• ${EMOJI_MAP.idea} [Most important insight with practical application]
+• ${EMOJI_MAP.tip} [Secondary insight with real-world relevance]
+• ${EMOJI_MAP.example} [Additional insight if particularly valuable]
+
+NOTABLE MOMENTS
+• ${EMOJI_MAP.quote} [Memorable quote or statement]
+• ${EMOJI_MAP.example} [Standout example or demonstration]
+• ${EMOJI_MAP.tip} [Key tip or recommendation]
+
+Context:
+Title: ${metadata.title}
 Channel: ${metadata.channelTitle}
 Description: ${metadata.description}
-
-Using the following transcript, please provide:
-
-1. 📝 OVERVIEW
-A brief (2-3 sentences) overview of what this video is about.
-
-2. 🎯 KEY POINTS
-List the main points discussed in the video (use bullet points with emojis that match the content).
-
-3. 💡 KEY INSIGHTS
-Share 2-3 most valuable insights or takeaways from the video.
-
-4. 🎬 HIGHLIGHTS
-Any particularly interesting moments, quotes, or examples worth noting.
 
 Transcript:
 ${transcript}
 
-Format the summary in a clean, easy-to-read way using appropriate spacing and emojis. Make it engaging but professional.
-Avoid using asterisks or markdown syntax. Use natural language and conversational tone.`;
+Important Guidelines:
+1. Use natural, conversational language
+2. Include specific examples and quotes from the video
+3. Make insights actionable and practical
+4. Add relevant emojis only at bullet points
+5. Keep formatting clean and consistent
+6. Focus on value for the viewer`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    // Post-process the text to ensure consistent formatting
+    // Ensure emojis are present and format is clean
     const processedText = text
-      .replace(/\*\*/g, '') // Remove any remaining asterisks
-      .replace(/\n\n+/g, '\n\n') // Normalize spacing
+      .replace(/OVERVIEW/g, `${EMOJI_MAP.overview} OVERVIEW`)
+      .replace(/MAIN TAKEAWAYS/g, `${EMOJI_MAP.key_points} MAIN TAKEAWAYS`)
+      .replace(/VALUABLE INSIGHTS/g, `${EMOJI_MAP.insights} VALUABLE INSIGHTS`)
+      .replace(/NOTABLE MOMENTS/g, `${EMOJI_MAP.highlights} NOTABLE MOMENTS`)
+      // Remove any duplicate emojis that might appear at the start of sections
+      .replace(/[📝🎯💡🎬]\s+[📝🎯💡🎬]/g, (match) => match[0])
+      .replace(/\*\*/g, '')
+      .replace(/\n\n+/g, '\n\n')
       .trim();
 
     return processedText;
@@ -62,31 +109,45 @@ export const answerQuestion = async (
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    const prompt = `You are a knowledgeable AI assistant that helps users understand YouTube video content. 
-    You have watched and analyzed this video thoroughly.
-
-Context:
-- Video: "${metadata.title}"
-- Channel: ${metadata.channelTitle}
-- Summary: ${summary}
-
-Full Transcript:
-${transcript}
+    const prompt = `As a knowledgeable and friendly AI assistant, provide a clear and engaging answer to this question about the YouTube video.
 
 Question: ${question}
 
-Please provide:
-1. A clear, direct answer to the question
-2. If relevant, include specific examples or quotes from the video
-3. If the answer isn't directly addressed in the video, say so clearly
-4. Use natural, conversational language
-5. If appropriate, use emojis to make the response more engaging
+Use these sources:
+1. Video Title: "${metadata.title}"
+2. Channel: ${metadata.channelTitle}
+3. Summary: ${summary}
+4. Full Transcript: ${transcript}
 
-Remember to be helpful and accurate while maintaining a friendly tone.`;
+Format your response in a clean, easy-to-read way:
+
+💡 Answer
+[Provide a clear, direct response without any markdown formatting]
+
+${EMOJI_MAP.quote} From the Video
+[Include 1-2 relevant, brief quotes or examples from the video]
+
+${EMOJI_MAP.tip} Key Points
+• [First key point]
+• [Second key point]
+(Add 2-3 bullet points if relevant)
+
+Guidelines:
+1. Keep the response concise and clear
+2. Don't use any markdown formatting (no **, *, etc.)
+3. Use natural, conversational language
+4. Include specific examples when relevant
+5. If something isn't covered in the video, say so clearly
+6. Keep sections short but informative`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
+    const text = response
+      .text()
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/\n\n+/g, '\n\n')
+      .trim();
 
     return text;
   } catch (error) {
