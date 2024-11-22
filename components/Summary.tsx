@@ -109,30 +109,30 @@ export default function Summary({ content, isLoading, metadata, transcript }: Su
             <img
               src={metadata.thumbnailUrl}
               alt={metadata.title}
-              className="w-full h-[300px] object-cover"
+              className="w-full h-[200px] sm:h-[300px] object-cover"
             />
             <div className="absolute bottom-3 right-3 bg-black/80 text-white px-2 py-1 rounded text-sm">
               {metadata.duration}
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="flex justify-between items-start gap-4">
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
               <div className="flex-1">
-                <h1 className="text-xl font-bold mb-2">{metadata.title}</h1>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
+                <h1 className="text-lg sm:text-xl font-bold mb-2">{metadata.title}</h1>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-gray-600">
                   <span>{metadata.channelTitle}</span>
-                  <span>•</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>{metadata.publishedAt}</span>
-                  <span>•</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>{parseInt(metadata.viewCount).toLocaleString()} views</span>
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleShare}
-                  className="p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                  className="flex-1 sm:flex-initial p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="Share video"
                 >
                   <Share2 className="w-5 h-5" />
@@ -140,7 +140,7 @@ export default function Summary({ content, isLoading, metadata, transcript }: Su
                 <button
                   onClick={handleSave}
                   disabled={isSaved}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                     isSaved
                       ? 'bg-green-100 text-green-600'
                       : 'bg-primary text-white hover:bg-primary-hover'
@@ -149,12 +149,14 @@ export default function Summary({ content, isLoading, metadata, transcript }: Su
                   {isSaved ? (
                     <>
                       <BookmarkCheck className="w-5 h-5" />
-                      Saved to Library
+                      <span className="sm:hidden">Saved</span>
+                      <span className="hidden sm:inline">Saved to Library</span>
                     </>
                   ) : (
                     <>
                       <BookmarkPlus className="w-5 h-5" />
-                      Save to Library
+                      <span className="sm:hidden">Save</span>
+                      <span className="hidden sm:inline">Save to Library</span>
                     </>
                   )}
                 </button>

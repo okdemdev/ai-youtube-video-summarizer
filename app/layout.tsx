@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={inter.className}>
         <Navigation />
-        <div className="pb-16 md:pt-16 md:pb-0">{children}</div>
+        <div className="pt-0 md:pt-16 pb-16 md:pb-0">{children}</div>
       </body>
     </html>
   );

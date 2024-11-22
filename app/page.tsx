@@ -79,11 +79,13 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-6 md:p-12 bg-gray-50">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-gray-50">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-center gap-2 mb-12">
-          <Youtube className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl md:text-4xl font-bold gradient-text">YouTube Summarizer</h1>
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <Youtube className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold gradient-text">
+            YouTube Summarizer
+          </h1>
         </div>
 
         <VideoInput onSubmit={handleSubmit} loading={loading} videoTitle={processingTitle} />
@@ -102,8 +104,8 @@ export default function Home() {
             />
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6 relative">
-            <div className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 relative">
+            <div className="space-y-4 sm:space-y-6">
               <Summary
                 content={summary}
                 isLoading={loading}
@@ -113,7 +115,7 @@ export default function Home() {
             </div>
 
             {metadata && summary && transcript && (
-              <div className="md:sticky md:top-20 h-fit">
+              <div className="lg:sticky lg:top-20 h-fit">
                 <QuestionAnswer transcript={transcript} summary={summary} metadata={metadata} />
               </div>
             )}

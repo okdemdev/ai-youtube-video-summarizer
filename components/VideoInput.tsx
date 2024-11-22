@@ -74,23 +74,25 @@ export default function VideoInput({ onSubmit, loading, videoTitle }: VideoInput
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste YouTube video URL here..."
-          className="w-full pl-12 pr-32 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+          className="w-full pl-12 pr-[100px] sm:pr-32 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-sm sm:text-base"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={!url || loading}
-          className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 sm:px-4 py-1.5 sm:py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
         >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Processing...
+              <span className="hidden sm:inline">Processing...</span>
+              <span className="sm:hidden">...</span>
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4" />
-              Summarize
+              <span className="hidden sm:inline">Summarize</span>
+              <span className="sm:hidden">Go</span>
             </>
           )}
         </button>

@@ -89,11 +89,11 @@ export default function QuestionAnswer({ transcript, summary, metadata }: Questi
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Brain className="w-6 h-6 text-primary" />
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+      <div className="flex items-start gap-3 mb-6">
+        <Brain className="w-6 h-6 text-primary flex-shrink-0" />
         <div>
-          <h2 className="text-xl font-bold">Ask Me Anything</h2>
+          <h2 className="text-lg sm:text-xl font-bold">Ask Me Anything</h2>
           <p className="text-sm text-gray-600">
             I've watched the entire video and can answer any specific questions you have!
             {previousQAs.length > 0 && (
