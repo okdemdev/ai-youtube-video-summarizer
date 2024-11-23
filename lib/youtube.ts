@@ -63,10 +63,6 @@ export async function downloadAudio(videoId: string): Promise<string> {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          Connection: 'keep-alive',
-          Cookie: 'CONSENT=YES+; Path=/',
         },
       },
     });
@@ -95,21 +91,27 @@ export async function downloadAudio(videoId: string): Promise<string> {
     });
 
     await new Promise((resolve, reject) => {
+      let error: Error | null = null;
+
       stream.pipe(writeStream);
 
-      stream.on('error', (error) => {
-        console.error('Stream error:', error);
-        reject(error);
+      stream.on('error', (err) => {
+        error = err;
+        console.error('Stream error:', err);
+        reject(err);
       });
 
-      writeStream.on('error', (error) => {
-        console.error('Write stream error:', error);
-        reject(error);
+      writeStream.on('error', (err) => {
+        error = err;
+        console.error('Write stream error:', err);
+        reject(err);
       });
 
       writeStream.on('finish', () => {
-        console.log('Audio download completed');
-        resolve(true);
+        if (!error) {
+          console.log('Audio download completed');
+          resolve(true);
+        }
       });
     });
 
