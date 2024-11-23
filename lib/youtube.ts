@@ -54,66 +54,25 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const writeStream = fs.createWriteStream(outputPath);
+    // Use yt-dlp with more options for reliability
+    const command = `${path.join(process.cwd(), 'bin', 'yt-dlp')} \
+      --no-check-certificates \
+      --no-cache-dir \
+      --extract-audio \
+      --audio-format wav \
+      --audio-quality 0 \
+      --postprocessor-args "-ar 16000 -ac 1" \
+      --no-playlist \
+      --geo-bypass \
+      --format bestaudio \
+      -o "${outputPath}" \
+      https://www.youtube.com/watch?v=${videoId}`;
 
-    // Get video info first to validate the URL
-    const info = await ytdl.getInfo(videoUrl, {
-      requestOptions: {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-      },
-    });
+    console.log('Executing command:', command);
 
-    // Get the audio format with the highest quality
-    const audioFormat = ytdl.chooseFormat(info.formats, {
-      quality: 'highestaudio',
-      filter: 'audioonly',
-    });
-
-    if (!audioFormat) {
-      throw new Error('No audio format found');
-    }
-
-    console.log('Selected audio format:', audioFormat.qualityLabel);
-
-    // Download the audio
-    const stream = ytdl.downloadFromInfo(info, {
-      format: audioFormat,
-      requestOptions: {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-      },
-    });
-
-    await new Promise((resolve, reject) => {
-      let error: Error | null = null;
-
-      stream.pipe(writeStream);
-
-      stream.on('error', (err) => {
-        error = err;
-        console.error('Stream error:', err);
-        reject(err);
-      });
-
-      writeStream.on('error', (err) => {
-        error = err;
-        console.error('Write stream error:', err);
-        reject(err);
-      });
-
-      writeStream.on('finish', () => {
-        if (!error) {
-          console.log('Audio download completed');
-          resolve(true);
-        }
-      });
-    });
+    const { stdout, stderr } = await execAsync(command);
+    console.log('Download stdout:', stdout);
+    if (stderr) console.error('Download stderr:', stderr);
 
     if (!fs.existsSync(outputPath)) {
       throw new Error(`Audio file not created at ${outputPath}`);
