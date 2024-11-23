@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
 import https from 'https';
+import ytdl from 'ytdl-core';
 
 const execAsync = promisify(exec);
 let speechClient: SpeechClient;
@@ -57,120 +58,75 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
-    await new Promise((resolve, reject) => {
-      https
-        .get(
-          videoUrl,
-          {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-            },
+    // First get info to validate video and get formats
+    const info = await ytdl.getInfo(videoId, {
+      requestOptions: {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      },
+    });
+
+    // Get only audio formats
+    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+    if (!audioFormats.length) {
+      throw new Error('No audio formats found');
+    }
+
+    // Choose the best quality audio format
+    const format = audioFormats.reduce((prev, curr) => {
+      return (prev.audioBitrate || 0) > (curr.audioBitrate || 0) ? prev : curr;
+    });
+
+    console.log('Selected audio format:', format.qualityLabel || format.audioQuality);
+
+    return new Promise((resolve, reject) => {
+      const stream = ytdl(videoUrl, {
+        format: format,
+        requestOptions: {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
-          (response) => {
-            // Check content type
-            const contentType = response.headers['content-type'];
-            if (contentType && contentType.includes('text/html')) {
-              reject(new Error('Received HTML instead of audio data'));
-              return;
-            }
+        },
+      });
 
-            if (response.statusCode === 302 || response.statusCode === 301) {
-              // Handle redirects
-              const redirectUrl = response.headers.location;
-              if (!redirectUrl) {
-                reject(new Error('No redirect URL found'));
-                return;
-              }
+      let error: Error | null = null;
 
-              https
-                .get(redirectUrl, (redirectResponse) => {
-                  // Check content type of redirect response
-                  const redirectContentType = redirectResponse.headers['content-type'];
-                  if (redirectContentType && redirectContentType.includes('text/html')) {
-                    reject(new Error('Received HTML instead of audio data after redirect'));
-                    return;
-                  }
+      stream.pipe(writeStream);
 
-                  let dataReceived = false;
-                  redirectResponse.pipe(writeStream);
+      stream.on('error', (err) => {
+        error = err;
+        console.error('Download stream error:', err);
+        reject(err);
+      });
 
-                  redirectResponse.on('data', () => {
-                    dataReceived = true;
-                  });
+      writeStream.on('error', (err) => {
+        error = err;
+        console.error('Write stream error:', err);
+        reject(err);
+      });
 
-                  redirectResponse.on('end', () => {
-                    if (!dataReceived) {
-                      reject(new Error('No data received from redirect'));
-                      return;
-                    }
-                    console.log('Download completed');
-                    resolve(true);
-                  });
+      writeStream.on('finish', () => {
+        if (error) return;
 
-                  redirectResponse.on('error', (error) => {
-                    console.error('Redirect response error:', error);
-                    reject(error);
-                  });
-                })
-                .on('error', (error) => {
-                  console.error('Redirect request error:', error);
-                  reject(error);
-                });
-            } else {
-              let dataReceived = false;
-              response.pipe(writeStream);
+        const stats = fs.statSync(outputPath);
+        if (stats.size === 0) {
+          reject(new Error('Downloaded file is empty'));
+          return;
+        }
 
-              response.on('data', () => {
-                dataReceived = true;
-              });
-
-              response.on('end', () => {
-                if (!dataReceived) {
-                  reject(new Error('No data received'));
-                  return;
-                }
-                console.log('Download completed');
-                resolve(true);
-              });
-
-              response.on('error', (error) => {
-                console.error('Response error:', error);
-                reject(error);
-              });
-            }
-          }
-        )
-        .on('error', (error) => {
-          console.error('Initial request error:', error);
-          reject(error);
-        });
+        console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
+        resolve(outputPath);
+      });
 
       // Add timeout
       setTimeout(() => {
+        stream.destroy();
         reject(new Error('Download timeout after 30 seconds'));
       }, 30000);
     });
-
-    if (!fs.existsSync(outputPath)) {
-      throw new Error(`Audio file not created at ${outputPath}`);
-    }
-
-    const stats = fs.statSync(outputPath);
-    if (stats.size === 0) {
-      throw new Error('Downloaded file is empty');
-    }
-
-    // Validate file content
-    const fileContent = fs.readFileSync(outputPath, { encoding: 'utf8', flag: 'r' });
-    if (fileContent.includes('<!DOCTYPE html>') || fileContent.includes('<html')) {
-      throw new Error('Downloaded content is HTML, not audio data');
-    }
-
-    console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
-    return outputPath;
   } catch (error) {
     // Cleanup on error
     if (fs.existsSync(outputPath)) {
