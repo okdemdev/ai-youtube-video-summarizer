@@ -58,8 +58,46 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
+    // Create agent with cookies
+    const cookies = [
+      {
+        name: 'CONSENT',
+        value: 'YES+1',
+        domain: '.youtube.com',
+        path: '/',
+      },
+      // Add these essential cookies for authentication
+      {
+        name: 'LOGIN_INFO',
+        value: process.env.YT_LOGIN_INFO || '',
+        domain: '.youtube.com',
+        path: '/',
+      },
+      {
+        name: 'HSID',
+        value: process.env.YT_HSID || '',
+        domain: '.youtube.com',
+        path: '/',
+      },
+      {
+        name: 'SSID',
+        value: process.env.YT_SSID || '',
+        domain: '.youtube.com',
+        path: '/',
+      },
+      {
+        name: 'SID',
+        value: process.env.YT_SID || '',
+        domain: '.youtube.com',
+        path: '/',
+      },
+    ];
+
+    const agent = ytdl.createAgent(cookies);
+
     // First get info to validate video and get formats
     const info = await ytdl.getInfo(videoId, {
+      agent,
       requestOptions: {
         headers: {
           'User-Agent':
