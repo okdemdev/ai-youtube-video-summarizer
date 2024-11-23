@@ -54,24 +54,63 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    // Use ytdl-core instead of yt-dlp
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
+    // Get video info first to validate the URL
+    const info = await ytdl.getInfo(videoUrl, {
+      requestOptions: {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          Connection: 'keep-alive',
+          Cookie: 'CONSENT=YES+; Path=/',
+        },
+      },
+    });
+
+    // Get the audio format with the highest quality
+    const audioFormat = ytdl.chooseFormat(info.formats, {
+      quality: 'highestaudio',
+      filter: 'audioonly',
+    });
+
+    if (!audioFormat) {
+      throw new Error('No audio format found');
+    }
+
+    console.log('Selected audio format:', audioFormat.qualityLabel);
+
+    // Download the audio
+    const stream = ytdl.downloadFromInfo(info, {
+      format: audioFormat,
+      requestOptions: {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      },
+    });
+
     await new Promise((resolve, reject) => {
-      ytdl(videoUrl, {
-        quality: 'lowestaudio',
-        filter: 'audioonly',
-      })
-        .pipe(writeStream)
-        .on('finish', () => {
-          console.log('Audio download completed');
-          resolve(true);
-        })
-        .on('error', (error) => {
-          console.error('Error downloading audio:', error);
-          reject(error);
-        });
+      stream.pipe(writeStream);
+
+      stream.on('error', (error) => {
+        console.error('Stream error:', error);
+        reject(error);
+      });
+
+      writeStream.on('error', (error) => {
+        console.error('Write stream error:', error);
+        reject(error);
+      });
+
+      writeStream.on('finish', () => {
+        console.log('Audio download completed');
+        resolve(true);
+      });
     });
 
     if (!fs.existsSync(outputPath)) {
