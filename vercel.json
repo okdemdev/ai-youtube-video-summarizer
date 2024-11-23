@@ -4,6 +4,12 @@
   "framework": "nextjs",
   "regions": ["fra1"],
   "env": {
-    "PYTHON_VERSION": "3.12"
-  }
+    "PYTHON_VERSION": "3.12",
+    "YOUTUBE_API_KEY": "AIzaSyCuujjetF6lhZyxr8ML_abcF_gLUhR91Jw",
+    "GEMINI_API_KEY": "AIzaSyCxnc4PiRJPdPkTG8bz2tPLAbN96DVTyZg",
+    "GOOGLE_APPLICATION_CREDENTIALS": "./google-credentials.json"
+  },
+  "files": [
+    "google-credentials.json"
+  ]
 }
