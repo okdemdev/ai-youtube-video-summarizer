@@ -6,7 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
 import https from 'https';
-import ytdl from 'ytdl-core';
+import ytdl from '@distube/ytdl-core';
 
 const execAsync = promisify(exec);
 let speechClient: SpeechClient;
@@ -93,8 +93,13 @@ export async function downloadAudio(videoId: string): Promise<string> {
       });
 
       let error: Error | null = null;
+      let dataReceived = false;
 
       stream.pipe(writeStream);
+
+      stream.on('data', () => {
+        dataReceived = true;
+      });
 
       stream.on('error', (err) => {
         error = err;
@@ -110,6 +115,10 @@ export async function downloadAudio(videoId: string): Promise<string> {
 
       writeStream.on('finish', () => {
         if (error) return;
+        if (!dataReceived) {
+          reject(new Error('No data received from stream'));
+          return;
+        }
 
         const stats = fs.statSync(outputPath);
         if (stats.size === 0) {
@@ -123,8 +132,10 @@ export async function downloadAudio(videoId: string): Promise<string> {
 
       // Add timeout
       setTimeout(() => {
-        stream.destroy();
-        reject(new Error('Download timeout after 30 seconds'));
+        if (!dataReceived) {
+          stream.destroy();
+          reject(new Error('Download timeout after 30 seconds'));
+        }
       }, 30000);
     });
   } catch (error) {

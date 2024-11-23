@@ -4,6 +4,7 @@ import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube'
 import { generateSummary } from '@/lib/ai';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes timeout
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,9 +27,17 @@ export async function POST(req: NextRequest) {
       const audioPath = await downloadAudio(videoId);
       console.log('Audio downloaded to:', audioPath);
 
+      if (!audioPath) {
+        throw new Error('Failed to download audio');
+      }
+
       console.log('Transcribing audio...');
       const transcription = await transcribeAudio(audioPath);
       console.log('Transcription completed, length:', transcription.length);
+
+      if (!transcription || transcription.length === 0) {
+        throw new Error('Failed to transcribe audio or transcription is empty');
+      }
 
       console.log('Generating summary...');
       const summary = await generateSummary(transcription, metadata);
@@ -43,7 +52,7 @@ export async function POST(req: NextRequest) {
       console.error('Detailed error:', {
         error: innerError,
         message: innerError instanceof Error ? innerError.message : String(innerError),
-        stack: innerError instanceof Error ? innerError.stack : undefined
+        stack: innerError instanceof Error ? innerError.stack : undefined,
       });
       throw innerError; // Re-throw to be caught by outer catch
     }
@@ -51,11 +60,14 @@ export async function POST(req: NextRequest) {
     console.error('Error processing video:', {
       error,
       message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
-    return NextResponse.json({ 
-      error: 'Failed to process video',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to process video',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
   }
 }
