@@ -58,52 +58,22 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
-    // Create cookies array according to documentation
-    const cookies = [
-      {
-        name: 'LOGIN_INFO',
-        value: process.env.YT_LOGIN_INFO || '',
-        domain: '.youtube.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-      },
-      {
-        name: 'HSID',
-        value: process.env.YT_HSID || '',
-        domain: '.youtube.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-      },
-      {
-        name: 'SSID',
-        value: process.env.YT_SSID || '',
-        domain: '.youtube.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-      },
-      {
-        name: 'SID',
-        value: process.env.YT_SID || '',
-        domain: '.youtube.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-      },
-    ];
+    // Construct cookie string directly
+    const cookieString = [
+      `LOGIN_INFO=${process.env.YT_LOGIN_INFO || ''}`,
+      `HSID=${process.env.YT_HSID || ''}`,
+      `SSID=${process.env.YT_SSID || ''}`,
+      `SID=${process.env.YT_SID || ''}`,
+      'CONSENT=YES+1',
+    ].join('; ');
 
-    // Create agent with cookies as per documentation
-    const agent = ytdl.createAgent(cookies);
-
-    // First get info with agent
+    // First get info with cookies
     const info = await ytdl.getInfo(videoId, {
-      agent,
       requestOptions: {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Cookie: cookieString,
         },
       },
     });
@@ -122,14 +92,13 @@ export async function downloadAudio(videoId: string): Promise<string> {
     console.log('Selected audio format:', format.qualityLabel || format.audioQuality);
 
     return new Promise((resolve, reject) => {
-      // Use the same agent for downloading
       const stream = ytdl(videoUrl, {
         format: format,
-        agent,
         requestOptions: {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Cookie: cookieString,
           },
         },
       });
