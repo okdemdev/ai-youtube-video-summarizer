@@ -12,11 +12,12 @@ const execAsync = promisify(exec);
 let speechClient: SpeechClient;
 
 try {
-  // Initialize with credentials from environment variable
-  const credentials = process.env.GOOGLE_CREDENTIALS
-    ? JSON.parse(process.env.GOOGLE_CREDENTIALS)
-    : require('./google-credentials.json');
+  // Initialize with credentials from environment variable only
+  if (!process.env.GOOGLE_CREDENTIALS) {
+    throw new Error('GOOGLE_CREDENTIALS environment variable is not set');
+  }
 
+  const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
   console.log('Initializing Speech Client with project ID:', credentials.project_id);
 
   speechClient = new SpeechClient({
@@ -31,7 +32,6 @@ try {
     message: error instanceof Error ? error.message : String(error),
     stack: error instanceof Error ? error.stack : undefined,
     hasCredentials: !!process.env.GOOGLE_CREDENTIALS,
-    credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS,
   });
 }
 

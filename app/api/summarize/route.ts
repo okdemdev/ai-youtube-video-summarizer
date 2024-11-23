@@ -4,7 +4,7 @@ import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube'
 import { generateSummary } from '@/lib/ai';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes timeout
+export const maxDuration = 60; // Set to 60 seconds as per Vercel's limits
 
 export async function POST(req: NextRequest) {
   try {
