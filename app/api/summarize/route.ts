@@ -17,25 +17,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
-    console.log('Fetching video metadata...');
-    const metadata = await getVideoMetadata(videoId);
+    try {
+      console.log('Fetching video metadata...');
+      const metadata = await getVideoMetadata(videoId);
+      console.log('Metadata fetched successfully');
 
-    console.log('Downloading audio...');
-    const audioPath = await downloadAudio(videoId);
+      console.log('Downloading audio...');
+      const audioPath = await downloadAudio(videoId);
+      console.log('Audio downloaded to:', audioPath);
 
-    console.log('Transcribing audio...');
-    const transcription = await transcribeAudio(audioPath);
+      console.log('Transcribing audio...');
+      const transcription = await transcribeAudio(audioPath);
+      console.log('Transcription completed, length:', transcription.length);
 
-    console.log('Generating summary...');
-    const summary = await generateSummary(transcription, metadata);
+      console.log('Generating summary...');
+      const summary = await generateSummary(transcription, metadata);
+      console.log('Summary generated successfully');
 
-    return NextResponse.json({
-      summary,
-      metadata,
-      transcript: transcription,
-    });
+      return NextResponse.json({
+        summary,
+        metadata,
+        transcript: transcription,
+      });
+    } catch (innerError) {
+      console.error('Detailed error:', {
+        error: innerError,
+        message: innerError instanceof Error ? innerError.message : String(innerError),
+        stack: innerError instanceof Error ? innerError.stack : undefined
+      });
+      throw innerError; // Re-throw to be caught by outer catch
+    }
   } catch (error: unknown) {
-    console.error('Error processing video:', error);
-    return NextResponse.json({ error: 'Failed to process video' }, { status: 500 });
+    console.error('Error processing video:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    return NextResponse.json({ 
+      error: 'Failed to process video',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
