@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp && chmod +x bin/yt-dlp && npm install",
+  "installCommand": "apt-get update && apt-get install -y python3 ffmpeg && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp && chmod +x bin/yt-dlp && npm install",
   "framework": "nextjs",
   "regions": ["fra1"],
   "env": {

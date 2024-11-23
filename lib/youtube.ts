@@ -54,31 +54,78 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    // Use yt-dlp with more options for reliability
-    const command = `${path.join(process.cwd(), 'bin', 'yt-dlp')} \
-      --no-check-certificates \
-      --no-cache-dir \
-      --extract-audio \
-      --audio-format wav \
-      --audio-quality 0 \
-      --postprocessor-args "-ar 16000 -ac 1" \
-      --no-playlist \
-      --geo-bypass \
-      --format bestaudio \
-      -o "${outputPath}" \
-      https://www.youtube.com/watch?v=${videoId}`;
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    console.log('Executing command:', command);
+    // First get the info
+    const info = await ytdl.getInfo(videoUrl);
 
-    const { stdout, stderr } = await execAsync(command);
-    console.log('Download stdout:', stdout);
-    if (stderr) console.error('Download stderr:', stderr);
+    // Get only audio format
+    const format = ytdl.chooseFormat(info.formats, {
+      quality: 'highestaudio',
+      filter: 'audioonly',
+    });
+
+    if (!format) {
+      throw new Error('No audio format found');
+    }
+
+    // Create write stream
+    const writeStream = fs.createWriteStream(outputPath);
+
+    // Download with specific format
+    const stream = ytdl(videoUrl, {
+      format: format,
+      requestOptions: {
+        headers: {
+          // Add common browser headers
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: '*/*',
+          'Accept-Encoding': 'gzip, deflate, br',
+          Connection: 'keep-alive',
+          Range: 'bytes=0-',
+        },
+      },
+    });
+
+    await new Promise((resolve, reject) => {
+      // Pipe the download to the file
+      stream.pipe(writeStream);
+
+      // Handle download completion
+      writeStream.on('finish', () => {
+        console.log('Download completed');
+        writeStream.end();
+        resolve(true);
+      });
+
+      // Handle errors
+      stream.on('error', (error) => {
+        console.error('Stream error:', error);
+        reject(error);
+      });
+
+      writeStream.on('error', (error) => {
+        console.error('Write error:', error);
+        reject(error);
+      });
+
+      // Add timeout
+      setTimeout(() => {
+        reject(new Error('Download timeout after 30 seconds'));
+      }, 30000);
+    });
 
     if (!fs.existsSync(outputPath)) {
       throw new Error(`Audio file not created at ${outputPath}`);
     }
 
-    console.log('Audio file created successfully at:', outputPath);
+    const stats = fs.statSync(outputPath);
+    if (stats.size === 0) {
+      throw new Error('Downloaded file is empty');
+    }
+
+    console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
     return outputPath;
   } catch (error) {
     console.error('Error downloading audio:', {
