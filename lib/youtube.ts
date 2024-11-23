@@ -58,15 +58,39 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
+    // Create cookie string in the new format
+    const cookies = [
+      {
+        name: 'LOGIN_INFO',
+        value: process.env.YT_LOGIN_INFO || '',
+        domain: '.youtube.com',
+      },
+      {
+        name: 'HSID',
+        value: process.env.YT_HSID || '',
+        domain: '.youtube.com',
+      },
+      {
+        name: 'SSID',
+        value: process.env.YT_SSID || '',
+        domain: '.youtube.com',
+      },
+      {
+        name: 'SID',
+        value: process.env.YT_SID || '',
+        domain: '.youtube.com',
+      },
+    ];
+
     // First get info to validate video and get formats
     const info = await ytdl.getInfo(videoId, {
       requestOptions: {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Cookie: `CONSENT=YES+1; LOGIN_INFO=${process.env.YT_LOGIN_INFO}; HSID=${process.env.YT_HSID}; SSID=${process.env.YT_SSID}; SID=${process.env.YT_SID}`,
         },
       },
+      cookies: cookies,
     });
 
     // Get only audio formats
@@ -89,9 +113,9 @@ export async function downloadAudio(videoId: string): Promise<string> {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Cookie: `CONSENT=YES+1; LOGIN_INFO=${process.env.YT_LOGIN_INFO}; HSID=${process.env.YT_HSID}; SSID=${process.env.YT_SSID}; SID=${process.env.YT_SID}`,
           },
         },
+        cookies: cookies,
       });
 
       let error: Error | null = null;
