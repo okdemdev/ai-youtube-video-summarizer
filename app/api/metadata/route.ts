@@ -1,13 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getVideoMetadata } from '@/lib/youtube';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
-  if (req.method !== 'POST') {
-    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
-  }
-
+export async function POST(req: NextRequest) {
   try {
     const { videoId } = await req.json();
 

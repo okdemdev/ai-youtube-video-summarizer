@@ -5,6 +5,5 @@
   "regions": ["fra1"],
   "env": {
     "PYTHON_VERSION": "3.12"
-  },
-  "output": "standalone"
+  }
 }

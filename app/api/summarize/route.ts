@@ -1,15 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { extractVideoId, urlSchema } from '@/lib/utils';
 import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube';
 import { generateSummary } from '@/lib/ai';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
-  if (req.method !== 'POST') {
-    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
-  }
-
+export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
     console.log('Received URL:', url);
