@@ -5,7 +5,7 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
-import ytdl from 'ytdl-core';
+import https from 'https';
 
 const execAsync = promisify(exec);
 let speechClient: SpeechClient;
@@ -55,60 +55,61 @@ export async function downloadAudio(videoId: string): Promise<string> {
     console.log('Downloading audio for video:', videoId);
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-    // First get the info
-    const info = await ytdl.getInfo(videoUrl);
-
-    // Get only audio format
-    const format = ytdl.chooseFormat(info.formats, {
-      quality: 'highestaudio',
-      filter: 'audioonly',
-    });
-
-    if (!format) {
-      throw new Error('No audio format found');
-    }
-
-    // Create write stream
     const writeStream = fs.createWriteStream(outputPath);
 
-    // Download with specific format
-    const stream = ytdl(videoUrl, {
-      format: format,
-      requestOptions: {
-        headers: {
-          // Add common browser headers
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: '*/*',
-          'Accept-Encoding': 'gzip, deflate, br',
-          Connection: 'keep-alive',
-          Range: 'bytes=0-',
-        },
-      },
-    });
-
     await new Promise((resolve, reject) => {
-      // Pipe the download to the file
-      stream.pipe(writeStream);
+      https
+        .get(
+          videoUrl,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5',
+            },
+          },
+          (response) => {
+            if (response.statusCode === 302 || response.statusCode === 301) {
+              // Handle redirects
+              const redirectUrl = response.headers.location;
+              if (!redirectUrl) {
+                reject(new Error('No redirect URL found'));
+                return;
+              }
 
-      // Handle download completion
-      writeStream.on('finish', () => {
-        console.log('Download completed');
-        writeStream.end();
-        resolve(true);
-      });
+              https
+                .get(redirectUrl, (redirectResponse) => {
+                  redirectResponse.pipe(writeStream);
 
-      // Handle errors
-      stream.on('error', (error) => {
-        console.error('Stream error:', error);
-        reject(error);
-      });
+                  redirectResponse.on('end', () => {
+                    console.log('Download completed');
+                    resolve(true);
+                  });
 
-      writeStream.on('error', (error) => {
-        console.error('Write error:', error);
-        reject(error);
-      });
+                  redirectResponse.on('error', (error) => {
+                    console.error('Redirect response error:', error);
+                    reject(error);
+                  });
+                })
+                .on('error', (error) => {
+                  console.error('Redirect request error:', error);
+                  reject(error);
+                });
+            } else {
+              response.pipe(writeStream);
+
+              response.on('end', () => {
+                console.log('Download completed');
+                resolve(true);
+              });
+            }
+          }
+        )
+        .on('error', (error) => {
+          console.error('Initial request error:', error);
+          reject(error);
+        });
 
       // Add timeout
       setTimeout(() => {
