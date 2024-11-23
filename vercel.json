@@ -2,13 +2,5 @@
   "buildCommand": "npm run build",
   "installCommand": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp && chmod +x bin/yt-dlp && npm install",
   "framework": "nextjs",
-  "regions": ["fra1"],
-  "env": {
-    "YOUTUBE_API_KEY": "AIzaSyCuujjetF6lhZyxr8ML_abcF_gLUhR91Jw",
-    "GEMINI_API_KEY": "AIzaSyCxnc4PiRJPdPkTG8bz2tPLAbN96DVTyZg",
-    "YT_LOGIN_INFO": "AFmmF2swRQIgZJTLVmhM_u0hc87cbhq-MvYSmiItDlE_TfSY-cYcCwQCIQDWLl02yG18jidbxIiDrixXQwkZCm08sSIZwOh9KpdoNQ:QUQ3MjNmeldPbndwd2dYN3M4YjlRbjR4YkRRTFEzcFUwRWJQOUllRDI0R3c2eElwVy1mLUl6Q3BrUW11N0ZxelREbjlrajZXVS1FZkNZSk1xTG5YZ00wRUdqMF9xdFVUcTVtQW1jd19jR0NNRGFCRFVMc0F5RWlOTlNNT3pzOV81SVJ0RWJLeDZodTZsQkJYcUtIODJuYXBlaUN0ZjdSTlRn",
-    "YT_HSID": "Also5o3I-3l4lwsNm",
-    "YT_SSID": "AuzP70tJ_LyKtxv1Y",
-    "YT_SID": "g.a000qgjyIqJ541AiQ5pprs0wj2S2l9RcKzK7bdZTvpOxkSM2IeRkbdiItJz34Ou6Yb9OlC9I4wACgYKAbUSARUSFQHGX2MipMPxx84RV5VvF3yEY66yrxoVAUF8yKptTS12DJFVOpHzNQAFiH0x0076"
-  }
+  "regions": ["fra1"]
 }
