@@ -10,9 +10,14 @@ const execAsync = promisify(exec);
 let speechClient: SpeechClient;
 
 try {
-  // Initialize with credentials path directly
+  // Initialize with credentials from environment variable
+  const credentials = process.env.GOOGLE_CREDENTIALS 
+    ? JSON.parse(process.env.GOOGLE_CREDENTIALS)
+    : require('./google-credentials.json');
+
   speechClient = new SpeechClient({
-    keyFilename: './google-credentials.json'  // Using the path directly as specified in your .env
+    credentials,
+    projectId: credentials.project_id
   });
 } catch (error) {
   console.error('Error initializing Speech Client:', error instanceof Error ? error.message : String(error));
