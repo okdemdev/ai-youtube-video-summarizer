@@ -70,6 +70,13 @@ export async function downloadAudio(videoId: string): Promise<string> {
             },
           },
           (response) => {
+            // Check content type
+            const contentType = response.headers['content-type'];
+            if (contentType && contentType.includes('text/html')) {
+              reject(new Error('Received HTML instead of audio data'));
+              return;
+            }
+
             if (response.statusCode === 302 || response.statusCode === 301) {
               // Handle redirects
               const redirectUrl = response.headers.location;
@@ -80,9 +87,25 @@ export async function downloadAudio(videoId: string): Promise<string> {
 
               https
                 .get(redirectUrl, (redirectResponse) => {
+                  // Check content type of redirect response
+                  const redirectContentType = redirectResponse.headers['content-type'];
+                  if (redirectContentType && redirectContentType.includes('text/html')) {
+                    reject(new Error('Received HTML instead of audio data after redirect'));
+                    return;
+                  }
+
+                  let dataReceived = false;
                   redirectResponse.pipe(writeStream);
 
+                  redirectResponse.on('data', () => {
+                    dataReceived = true;
+                  });
+
                   redirectResponse.on('end', () => {
+                    if (!dataReceived) {
+                      reject(new Error('No data received from redirect'));
+                      return;
+                    }
                     console.log('Download completed');
                     resolve(true);
                   });
@@ -97,11 +120,25 @@ export async function downloadAudio(videoId: string): Promise<string> {
                   reject(error);
                 });
             } else {
+              let dataReceived = false;
               response.pipe(writeStream);
 
+              response.on('data', () => {
+                dataReceived = true;
+              });
+
               response.on('end', () => {
+                if (!dataReceived) {
+                  reject(new Error('No data received'));
+                  return;
+                }
                 console.log('Download completed');
                 resolve(true);
+              });
+
+              response.on('error', (error) => {
+                console.error('Response error:', error);
+                reject(error);
               });
             }
           }
@@ -126,9 +163,25 @@ export async function downloadAudio(videoId: string): Promise<string> {
       throw new Error('Downloaded file is empty');
     }
 
+    // Validate file content
+    const fileContent = fs.readFileSync(outputPath, { encoding: 'utf8', flag: 'r' });
+    if (fileContent.includes('<!DOCTYPE html>') || fileContent.includes('<html')) {
+      throw new Error('Downloaded content is HTML, not audio data');
+    }
+
     console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
     return outputPath;
   } catch (error) {
+    // Cleanup on error
+    if (fs.existsSync(outputPath)) {
+      try {
+        fs.unlinkSync(outputPath);
+        console.log('Cleaned up invalid file:', outputPath);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    }
+
     console.error('Error downloading audio:', {
       error,
       message: error instanceof Error ? error.message : String(error),
