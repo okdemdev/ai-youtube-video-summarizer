@@ -1,10 +1,9 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "python3 -m pip install -r requirements.txt && npm install",
+  "installCommand": "curl -L https://github.com/yt-dlp/yt-dlp/releases/download/2023.11.16/yt-dlp -o bin/yt-dlp && chmod +x bin/yt-dlp && npm install",
   "framework": "nextjs",
   "regions": ["fra1"],
   "env": {
-    "PYTHON_VERSION": "3.12",
     "YOUTUBE_API_KEY": "AIzaSyCuujjetF6lhZyxr8ML_abcF_gLUhR91Jw",
     "GEMINI_API_KEY": "AIzaSyCxnc4PiRJPdPkTG8bz2tPLAbN96DVTyZg"
   }
