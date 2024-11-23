@@ -51,8 +51,10 @@ export async function downloadAudio(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
 
   try {
-    // Use absolute path to yt-dlp in production
-    const ytDlpPath = process.env.NODE_ENV === 'production' ? '/var/task/yt-dlp' : 'yt-dlp';
+    // Use path relative to project root
+    const ytDlpPath = path.join(process.cwd(), 'bin', 'yt-dlp');
+    console.log('yt-dlp path:', ytDlpPath);
+    console.log('File exists:', fs.existsSync(ytDlpPath));
     
     // Download as WAV format with specific sampling rate and mono channel
     const command = `${ytDlpPath} -x --audio-format wav --audio-quality 0 --postprocessor-args "-ar 16000 -ac 1" -o "${outputPath}" https://www.youtube.com/watch?v=${videoId}`;
@@ -73,8 +75,9 @@ export async function downloadAudio(videoId: string): Promise<string> {
       error,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      command: process.env.NODE_ENV === 'production' ? '/var/task/yt-dlp' : 'yt-dlp',
-      outputPath
+      cwd: process.cwd(),
+      outputPath,
+      files: fs.readdirSync(process.cwd())
     });
     throw new Error(`Failed to download audio: ${error instanceof Error ? error.message : String(error)}`);
   }
