@@ -6,7 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
 import https from 'https';
-import ytdl from '@distube/ytdl-core';
+import ytdl, { downloadOptions, getInfoOptions } from '@distube/ytdl-core';
 
 const execAsync = promisify(exec);
 let speechClient: SpeechClient;
@@ -90,8 +90,7 @@ export async function downloadAudio(videoId: string): Promise<string> {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       },
-      cookies: cookies,
-    });
+    } as getInfoOptions);
 
     // Get only audio formats
     const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
@@ -115,8 +114,7 @@ export async function downloadAudio(videoId: string): Promise<string> {
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         },
-        cookies: cookies,
-      });
+      } as downloadOptions);
 
       let error: Error | null = null;
       let dataReceived = false;
