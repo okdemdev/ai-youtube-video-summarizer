@@ -58,13 +58,16 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const writeStream = fs.createWriteStream(outputPath);
 
-    // Construct cookie string directly
+    // Add more required cookies
     const cookieString = [
       `LOGIN_INFO=${process.env.YT_LOGIN_INFO || ''}`,
       `HSID=${process.env.YT_HSID || ''}`,
       `SSID=${process.env.YT_SSID || ''}`,
       `SID=${process.env.YT_SID || ''}`,
       'CONSENT=YES+1',
+      'GPS=1',
+      'VISITOR_INFO1_LIVE=yes',
+      'YSC=yes',
     ].join('; ');
 
     // First get info with cookies
@@ -74,31 +77,36 @@ export async function downloadAudio(videoId: string): Promise<string> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Cookie: cookieString,
+          'x-youtube-identity-token': process.env.YT_LOGIN_INFO?.split(':')[0] || '',
+          Accept: '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          Connection: 'keep-alive',
         },
       },
     });
 
-    // Get only audio formats
-    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+    // Get only audio formats and sort by quality
+    const audioFormats = ytdl
+      .filterFormats(info.formats, 'audioonly')
+      .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
+
     if (!audioFormats.length) {
       throw new Error('No audio formats found');
     }
 
-    // Choose the best quality audio format
-    const format = audioFormats.reduce((prev, curr) => {
-      return (prev.audioBitrate || 0) > (curr.audioBitrate || 0) ? prev : curr;
-    });
-
+    // Choose the first (highest quality) format
+    const format = audioFormats[0];
     console.log('Selected audio format:', format.qualityLabel || format.audioQuality);
 
     return new Promise((resolve, reject) => {
-      const stream = ytdl(videoUrl, {
+      const stream = ytdl.downloadFromInfo(info, {
         format: format,
         requestOptions: {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             Cookie: cookieString,
+            'x-youtube-identity-token': process.env.YT_LOGIN_INFO?.split(':')[0] || '',
           },
         },
       });
