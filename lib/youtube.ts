@@ -80,8 +80,8 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    // Use yt-dlp to download audio with mono channel
-    const ytDlpProcess = spawn('yt-dlp', [
+    const ytDlpPath = path.join(process.cwd(), 'bin', 'yt-dlp');
+    const ytDlpProcess = spawn(ytDlpPath, [
       '--extract-audio',
       '--audio-format',
       'wav',
