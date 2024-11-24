@@ -83,16 +83,27 @@ export async function downloadAudio(videoId: string): Promise<string> {
     // Create write stream before starting download
     const fileStream = fs.createWriteStream(outputPath);
 
-    // Get video info with cookies
+    // Additional headers that might help bypass the bot detection
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      Connection: 'keep-alive',
+      Cookie: process.env.YOUTUBE_COOKIES || '',
+      Referer: 'https://www.youtube.com/',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
+    };
+
+    // Get video info with enhanced options
     const info = await ytdl.getInfo(videoUrl, {
       agent,
-      requestOptions: {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Cookie: process.env.YOUTUBE_COOKIES || '',
-        },
-      },
+      requestOptions: { headers },
+      lang: 'en',
     });
 
     // Get only audio formats and sort by quality
@@ -111,63 +122,66 @@ export async function downloadAudio(videoId: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const stream = ytdl.downloadFromInfo(info, {
         format: format,
-        agent, // Use the same agent for download
-        requestOptions: {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        },
+        agent,
+        requestOptions: { headers },
       });
 
       let error: Error | null = null;
       let dataReceived = false;
 
-      stream.pipe(fileStream);
+      // Set up error handling for the stream
+      const handleError = (err: Error) => {
+        error = err;
+        console.error('Stream error:', err);
+        stream.destroy();
+        fileStream.destroy();
+        if (fs.existsSync(outputPath)) {
+          fs.unlinkSync(outputPath);
+        }
+        reject(err);
+      };
 
-      stream.on('data', () => {
+      stream.on('error', handleError);
+      fileStream.on('error', handleError);
+
+      stream.on('data', (chunk) => {
         dataReceived = true;
       });
 
-      stream.on('error', (err: Error) => {
-        error = err;
-        console.error('Download stream error:', err);
-        fileStream.destroy();
-        reject(err);
-      });
-
-      fileStream.on('error', (err: Error) => {
-        error = err;
-        console.error('Write stream error:', err);
-        stream.destroy();
-        reject(err);
-      });
+      stream.pipe(fileStream);
 
       fileStream.on('finish', () => {
         if (error) return;
+
         if (!dataReceived) {
-          reject(new Error('No data received from stream'));
+          handleError(new Error('No data received from stream'));
           return;
         }
 
-        const stats = fs.statSync(outputPath);
-        if (stats.size === 0) {
-          reject(new Error('Downloaded file is empty'));
-          return;
-        }
+        try {
+          const stats = fs.statSync(outputPath);
+          if (stats.size === 0) {
+            handleError(new Error('Downloaded file is empty'));
+            return;
+          }
 
-        console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
-        resolve(outputPath);
+          console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
+          resolve(outputPath);
+        } catch (err) {
+          handleError(err as Error);
+        }
       });
 
       // Add timeout
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (!dataReceived) {
-          stream.destroy();
-          fileStream.destroy();
-          reject(new Error('Download timeout after 30 seconds'));
+          handleError(new Error('Download timeout after 30 seconds'));
         }
       }, 30000);
+
+      // Clear timeout if stream ends or errors
+      stream.on('end', () => clearTimeout(timeout));
+      stream.on('error', () => clearTimeout(timeout));
     });
   } catch (error) {
     // Cleanup on error
@@ -186,7 +200,8 @@ export async function downloadAudio(videoId: string): Promise<string> {
       stack: error instanceof Error ? error.stack : undefined,
       cwd: process.cwd(),
       outputPath,
-      files: fs.readdirSync(process.cwd()),
+      videoId,
+      cookies: process.env.YOUTUBE_COOKIES ? 'Present' : 'Missing',
     });
     throw new Error(
       `Failed to download audio: ${error instanceof Error ? error.message : String(error)}`
