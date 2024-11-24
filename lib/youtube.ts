@@ -97,6 +97,9 @@ export async function downloadAudio(videoId: string): Promise<string> {
     // Create agent with cookies
     const agent = createCookieAgent();
 
+    // Create write stream before starting download
+    const fileStream = fs.createWriteStream(outputPath);
+
     // Get video info with agent
     const info = await ytdl.getInfo(videoId, {
       agent,
@@ -121,7 +124,7 @@ export async function downloadAudio(videoId: string): Promise<string> {
     const format = audioFormats[0];
     console.log('Selected audio format:', format.qualityLabel || format.audioQuality);
 
-    return new Promise((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const stream = ytdl.downloadFromInfo(info, {
         format: format,
         agent, // Use the same agent for download
@@ -136,25 +139,25 @@ export async function downloadAudio(videoId: string): Promise<string> {
       let error: Error | null = null;
       let dataReceived = false;
 
-      stream.pipe(writeStream);
+      stream.pipe(fileStream);
 
       stream.on('data', () => {
         dataReceived = true;
       });
 
-      stream.on('error', (err) => {
+      stream.on('error', (err: Error) => {
         error = err;
         console.error('Download stream error:', err);
         reject(err);
       });
 
-      writeStream.on('error', (err) => {
+      fileStream.on('error', (err: Error) => {
         error = err;
         console.error('Write stream error:', err);
         reject(err);
       });
 
-      writeStream.on('finish', () => {
+      fileStream.on('finish', () => {
         if (error) return;
         if (!dataReceived) {
           reject(new Error('No data received from stream'));
