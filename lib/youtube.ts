@@ -14,18 +14,35 @@ async function initSpeechClient() {
   if (speechClient) return speechClient;
 
   try {
-    const credentials = process.env.GOOGLE_CREDENTIALS;
-    if (!credentials) {
-      throw new Error('GOOGLE_CREDENTIALS environment variable is not set');
+    let credentials;
+
+    // First try to get credentials from environment variable (for production/Vercel)
+    if (process.env.GOOGLE_CREDENTIALS) {
+      console.log('Using credentials from GOOGLE_CREDENTIALS environment variable');
+      credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    }
+    // If not found, try to read from file (for local development)
+    else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('Reading credentials from file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      const credentialsPath = path.resolve(
+        process.cwd(),
+        process.env.GOOGLE_APPLICATION_CREDENTIALS
+      );
+
+      if (!fs.existsSync(credentialsPath)) {
+        throw new Error(`Credentials file not found at ${credentialsPath}`);
+      }
+
+      credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+    } else {
+      throw new Error('No Google credentials found in environment or file');
     }
 
-    // Parse credentials directly from environment variable
-    const parsedCredentials = JSON.parse(credentials);
-    console.log('Initializing Speech Client with project ID:', parsedCredentials.project_id);
+    console.log('Initializing Speech Client with project ID:', credentials.project_id);
 
     speechClient = new SpeechClient({
-      credentials: parsedCredentials,
-      projectId: parsedCredentials.project_id,
+      credentials: credentials,
+      projectId: credentials.project_id,
     });
 
     console.log('Speech Client initialized successfully');
@@ -35,6 +52,8 @@ async function initSpeechClient() {
       error,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      hasEnvCredentials: !!process.env.GOOGLE_CREDENTIALS,
+      hasFileCredentials: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
     });
     throw error;
   }
