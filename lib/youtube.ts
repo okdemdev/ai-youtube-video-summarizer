@@ -1,7 +1,25 @@
 import { google } from 'googleapis';
 
 const RAPID_API_KEY = 'c4c53bacdbmsh15f81de270e4fe7p185447jsnfeca2858e5fe';
-const youtube = google.youtube('v3');
+
+const getYoutubeClient = () => {
+  if (process.env.GOOGLE_CREDENTIALS) {
+    // Production: Use JSON credentials from environment variable
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+    return google.youtube({
+      version: 'v3',
+      auth: new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+      }),
+    });
+  } else {
+    // Development: Use API key directly
+    return google.youtube('v3');
+  }
+};
+
+const youtube = getYoutubeClient();
 
 export interface VideoMetadata {
   videoId: string;
