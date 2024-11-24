@@ -45,8 +45,10 @@ export async function transcribeVideo(videoId: string): Promise<string> {
   try {
     console.log('Requesting transcription for video:', videoId);
 
-    const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
-    const url = `https://youtube-transcripts.p.rapidapi.com/youtube/transcript`;
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const url = `https://youtube-transcripts.p.rapidapi.com/youtube/transcript?url=${encodeURIComponent(
+      youtubeUrl
+    )}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -67,11 +69,12 @@ export async function transcribeVideo(videoId: string): Promise<string> {
     const data = await response.json();
     console.log('Raw API Response:', data);
 
-    if (!Array.isArray(data)) {
+    // Check if the response contains content array
+    if (!data.content || !Array.isArray(data.content)) {
       throw new Error('Invalid response format from API');
     }
 
-    const transcript = data
+    const transcript = data.content
       .map((segment: { text: string; duration: number; offset: number }) => segment.text)
       .join(' ');
 
