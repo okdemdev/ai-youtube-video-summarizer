@@ -14,29 +14,18 @@ async function initSpeechClient() {
   if (speechClient) return speechClient;
 
   try {
-    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (!credentialsPath) {
-      throw new Error('GOOGLE_APPLICATION_CREDENTIALS environment variable is not set');
+    const credentials = process.env.GOOGLE_CREDENTIALS;
+    if (!credentials) {
+      throw new Error('GOOGLE_CREDENTIALS environment variable is not set');
     }
 
-    // Use path.resolve to get absolute path
-    const absolutePath = path.resolve(process.cwd(), credentialsPath);
-    console.log('Loading credentials from:', absolutePath);
-
-    if (!fs.existsSync(absolutePath)) {
-      throw new Error(`Credentials file not found at ${absolutePath}`);
-    }
-
-    // Read credentials from file
-    const credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
-    console.log('Initializing Speech Client with project ID:', credentials.project_id);
+    // Parse credentials directly from environment variable
+    const parsedCredentials = JSON.parse(credentials);
+    console.log('Initializing Speech Client with project ID:', parsedCredentials.project_id);
 
     speechClient = new SpeechClient({
-      credentials: {
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      },
-      projectId: credentials.project_id,
+      credentials: parsedCredentials,
+      projectId: parsedCredentials.project_id,
     });
 
     console.log('Speech Client initialized successfully');
@@ -46,8 +35,6 @@ async function initSpeechClient() {
       error,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      cwd: process.cwd(),
-      credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     });
     throw error;
   }
