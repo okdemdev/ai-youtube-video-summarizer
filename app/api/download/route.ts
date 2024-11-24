@@ -3,7 +3,7 @@ import { downloadAudio } from '@/lib/youtube';
 import { extractVideoId } from '@/lib/utils';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes
+export const maxDuration = 60; // Set to maximum allowed for hobby plan (60 seconds)
 
 export async function POST(req: NextRequest) {
   try {
