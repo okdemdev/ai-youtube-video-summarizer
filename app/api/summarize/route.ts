@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractVideoId, urlSchema } from '@/lib/utils';
-import { downloadAudio, transcribeAudio, getVideoMetadata } from '@/lib/youtube';
+import { transcribeVideo, getVideoMetadata } from '@/lib/youtube';
 import { generateSummary } from '@/lib/ai';
 
 export const runtime = 'nodejs';
@@ -23,20 +23,12 @@ export async function POST(req: NextRequest) {
       const metadata = await getVideoMetadata(videoId);
       console.log('Metadata fetched successfully');
 
-      console.log('Downloading audio...');
-      const audioPath = await downloadAudio(videoId);
-      console.log('Audio downloaded to:', audioPath);
-
-      if (!audioPath) {
-        throw new Error('Failed to download audio');
-      }
-
-      console.log('Transcribing audio...');
-      const transcription = await transcribeAudio(audioPath);
+      console.log('Transcribing video...');
+      const transcription = await transcribeVideo(videoId);
       console.log('Transcription completed, length:', transcription.length);
 
       if (!transcription || transcription.length === 0) {
-        throw new Error('Failed to transcribe audio or transcription is empty');
+        throw new Error('Failed to transcribe video or transcription is empty');
       }
 
       console.log('Generating summary...');
@@ -54,7 +46,7 @@ export async function POST(req: NextRequest) {
         message: innerError instanceof Error ? innerError.message : String(innerError),
         stack: innerError instanceof Error ? innerError.stack : undefined,
       });
-      throw innerError; // Re-throw to be caught by outer catch
+      throw innerError;
     }
   } catch (error: unknown) {
     console.error('Error processing video:', {

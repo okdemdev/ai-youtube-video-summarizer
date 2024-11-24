@@ -1,65 +1,6 @@
-import { SpeechClient } from '@google-cloud/speech';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { google } from 'googleapis';
-import { spawn } from 'child_process';
 
-const execAsync = promisify(exec);
-let speechClient: SpeechClient | null = null;
-
-async function initSpeechClient() {
-  if (speechClient) return speechClient;
-
-  try {
-    let credentials;
-
-    // First try to get credentials from environment variable (for production/Vercel)
-    if (process.env.GOOGLE_CREDENTIALS) {
-      console.log('Using credentials from GOOGLE_CREDENTIALS environment variable');
-      credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-    }
-    // If not found, try to read from file (for local development)
-    else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('Reading credentials from file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      const credentialsPath = path.resolve(
-        process.cwd(),
-        process.env.GOOGLE_APPLICATION_CREDENTIALS
-      );
-
-      if (!fs.existsSync(credentialsPath)) {
-        throw new Error(`Credentials file not found at ${credentialsPath}`);
-      }
-
-      credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-    } else {
-      throw new Error('No Google credentials found in environment or file');
-    }
-
-    console.log('Initializing Speech Client with project ID:', credentials.project_id);
-
-    speechClient = new SpeechClient({
-      credentials: credentials,
-      projectId: credentials.project_id,
-    });
-
-    console.log('Speech Client initialized successfully');
-    return speechClient;
-  } catch (error) {
-    console.error('Error initializing Speech Client:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      hasEnvCredentials: !!process.env.GOOGLE_CREDENTIALS,
-      hasFileCredentials: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
-    throw error;
-  }
-}
-
-const MAX_CHUNK_DURATION = 45;
+const RAPID_API_KEY = 'c4c53bacdbmsh15f81de270e4fe7p185447jsnfeca2858e5fe';
 const youtube = google.youtube('v3');
 
 export interface VideoMetadata {
@@ -73,173 +14,53 @@ export interface VideoMetadata {
   publishedAt: string;
 }
 
-export async function downloadAudio(videoId: string): Promise<string> {
-  const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
+export async function transcribeVideo(videoId: string): Promise<string> {
   try {
-    console.log('Downloading audio for video:', videoId);
+    console.log('Requesting transcription for video:', videoId);
 
-    const ytDlpPath = path.join(process.cwd(), 'bin', 'yt-dlp');
-    const ytDlpProcess = spawn(ytDlpPath, [
-      '--extract-audio',
-      '--audio-format',
-      'wav',
-      '--audio-quality',
-      '0',
-      '--postprocessor-args',
-      '-ac 1', // Convert to mono
-      '--output',
-      outputPath,
-      videoUrl,
-    ]);
+    const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+    const url = `https://youtube-transcripts.p.rapidapi.com/youtube/transcript?url=${youtubeUrl}`;
 
-    return new Promise((resolve, reject) => {
-      ytDlpProcess.stderr.on('data', (data) => {
-        console.log(`yt-dlp stderr: ${data}`);
-      });
-
-      ytDlpProcess.on('close', (code) => {
-        if (code === 0) {
-          if (fs.existsSync(outputPath)) {
-            const stats = fs.statSync(outputPath);
-            if (stats.size > 0) {
-              console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
-              resolve(outputPath);
-            } else {
-              reject(new Error('Downloaded file is empty'));
-            }
-          } else {
-            reject(new Error('Output file not found'));
-          }
-        } else {
-          reject(new Error(`yt-dlp process exited with code ${code}`));
-        }
-      });
-
-      ytDlpProcess.on('error', (err) => {
-        reject(new Error(`Failed to start yt-dlp: ${err.message}`));
-      });
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-key': RAPID_API_KEY,
+        'x-rapidapi-host': 'youtube-transcripts.p.rapidapi.com',
+      },
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Response:', errorText);
+      throw new Error(`RapidAPI error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response data:', data);
+
+    if (!data || !data.content || !Array.isArray(data.content)) {
+      throw new Error('Invalid response format from API');
+    }
+
+    const transcript = data.content
+      .map((segment: { text: string; offset: number; duration: number }) => segment.text)
+      .join(' ');
+
+    if (!transcript) {
+      throw new Error('No transcript available for this video');
+    }
+
+    return transcript;
   } catch (error) {
-    if (fs.existsSync(outputPath)) {
-      try {
-        fs.unlinkSync(outputPath);
-        console.log('Cleaned up invalid file:', outputPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up file:', cleanupError);
-      }
-    }
-
-    console.error('Error downloading audio:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      cwd: process.cwd(),
-      outputPath,
-      videoId,
-    });
-    throw new Error(
-      `Failed to download audio: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-
-export async function transcribeAudio(audioPath: string): Promise<string> {
-  try {
-    const client = await initSpeechClient();
-    if (!client) {
-      throw new Error('Failed to initialize speech client');
-    }
-
-    if (!fs.existsSync(audioPath)) {
-      throw new Error(`Audio file not found at ${audioPath}`);
-    }
-
-    console.log('Reading audio file:', audioPath);
-    const audio = fs.readFileSync(audioPath);
-    console.log('Audio file read, size:', audio.length, 'bytes');
-
-    const config = {
-      encoding: 'LINEAR16' as const,
-      sampleRateHertz: 48000,
-      languageCode: 'en-US',
-    };
-
-    const audioLength = audio.length;
-    const chunkSize = MAX_CHUNK_DURATION * 48000 * 2;
-    const chunks: Buffer[] = [];
-
-    // Split audio into chunks
-    for (let i = 0; i < audioLength; i += chunkSize) {
-      const chunk = audio.slice(i, Math.min(i + chunkSize, audioLength));
-      chunks.push(chunk);
-    }
-
-    console.log('Split audio into', chunks.length, 'chunks');
-    let fullTranscript = '';
-
-    // Process each chunk
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      console.log(`Processing chunk ${i + 1}/${chunks.length}, size:`, chunk.length, 'bytes');
-
-      const request = {
-        audio: { content: chunk.toString('base64') },
-        config: config,
-      };
-
-      try {
-        const [response] = await client.recognize(request);
-        const transcription = response.results
-          ?.map((result) => result.alternatives?.[0]?.transcript)
-          .join('\n');
-
-        if (transcription) {
-          fullTranscript += transcription + ' ';
-          console.log(`Chunk ${i + 1} transcribed successfully, length:`, transcription.length);
-        } else {
-          console.log(`No transcription returned for chunk ${i + 1}`);
-        }
-      } catch (chunkError) {
-        console.error(`Error transcribing chunk ${i + 1}:`, {
-          error: chunkError,
-          message: chunkError instanceof Error ? chunkError.message : String(chunkError),
-          stack: chunkError instanceof Error ? chunkError.stack : undefined,
-        });
-        throw chunkError;
-      }
-    }
-
-    // Cleanup the audio file
-    try {
-      fs.unlinkSync(audioPath);
-      console.log('Cleaned up audio file:', audioPath);
-    } catch (cleanupError) {
-      console.error('Error cleaning up audio file:', cleanupError);
-    }
-
-    return fullTranscript.trim();
-  } catch (error) {
-    console.error('Error transcribing audio:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      audioPath,
-      fileExists: fs.existsSync(audioPath),
-    });
-    throw new Error(
-      `Failed to transcribe audio: ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error('Error transcribing video:', error);
+    throw new Error('Failed to transcribe video');
   }
 }
 
 export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> {
   try {
-    console.log('Using YouTube API Key:', process.env.YOUTUBE_API_KEY ? 'Present' : 'Missing');
-
     const response = await youtube.videos.list({
-      key: process.env.YOUTUBE_API_KEY, // Using your YouTube API key
+      key: process.env.YOUTUBE_API_KEY,
       part: ['snippet', 'contentDetails', 'statistics'],
       id: [videoId],
     });
@@ -249,7 +70,7 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
       throw new Error('Video not found');
     }
 
-    const metadata = {
+    return {
       videoId,
       title: video.snippet?.title || '',
       description: video.snippet?.description || '',
@@ -259,24 +80,8 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
       channelTitle: video.snippet?.channelTitle || '',
       publishedAt: video.snippet?.publishedAt || '',
     };
-
-    console.log('Successfully fetched metadata:', {
-      title: metadata.title,
-      duration: metadata.duration,
-      channelTitle: metadata.channelTitle,
-    });
-
-    return metadata;
   } catch (error) {
-    console.error('Error fetching video metadata:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      videoId,
-      hasYoutubeKey: !!process.env.YOUTUBE_API_KEY,
-    });
-    throw new Error(
-      `Failed to fetch video metadata: ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error('Error fetching video metadata:', error);
+    throw new Error('Failed to fetch video metadata');
   }
 }
