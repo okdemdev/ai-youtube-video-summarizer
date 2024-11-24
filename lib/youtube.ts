@@ -6,7 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
 import https from 'https';
-import ytdl, { downloadOptions, getInfoOptions } from '@distube/ytdl-core';
+import { Readable } from 'stream';
 
 const execAsync = promisify(exec);
 let speechClient: SpeechClient;
@@ -49,26 +49,27 @@ export interface VideoMetadata {
   publishedAt: string;
 }
 
-function createCookieAgent() {
-  const cookieString = process.env.YOUTUBE_COOKIES;
-  if (!cookieString) {
-    console.warn('No YouTube cookies found in environment variables');
-    return undefined;
+// Add this helper function outside the main function
+async function streamToReadable(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  readable: Readable
+) {
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        readable.push(null); // Signal the end of the stream
+        break;
+      }
+      if (!readable.push(value)) {
+        await new Promise((resolve) => readable.once('drain', resolve));
+      }
+    }
+  } catch (err) {
+    readable.destroy(
+      new Error(`Stream reading error: ${err instanceof Error ? err.message : String(err)}`)
+    );
   }
-
-  // Parse cookie string into array of cookie objects
-  const cookieObjects = cookieString.split(';').map((cookie) => {
-    const [name, ...valueParts] = cookie.trim().split('=');
-    const value = valueParts.join('='); // Rejoin in case value contains =
-    return {
-      name: name.trim(),
-      value: value.trim(),
-      domain: '.youtube.com',
-      path: '/',
-    };
-  });
-
-  return ytdl.createAgent(cookieObjects);
 }
 
 export async function downloadAudio(videoId: string): Promise<string> {
@@ -77,63 +78,47 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const agent = createCookieAgent();
-
-    // Create write stream before starting download
-    const fileStream = fs.createWriteStream(outputPath);
-
-    // Additional headers that might help bypass the bot detection
-    const headers = {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      Connection: 'keep-alive',
-      Cookie: process.env.YOUTUBE_COOKIES || '',
-      Referer: 'https://www.youtube.com/',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'same-origin',
-      'Sec-Fetch-User': '?1',
-      'Upgrade-Insecure-Requests': '1',
+    // First, request the audio URL from RapidAPI
+    const options = {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY!,
+        'X-RapidAPI-Host': process.env.RAPIDAPI_HOST!,
+      },
     };
 
-    // Get video info with enhanced options
-    const info = await ytdl.getInfo(videoUrl, {
-      agent,
-      requestOptions: { headers },
-      lang: 'en',
-    });
+    const response = await fetch(
+      `https://${process.env.RAPIDAPI_HOST}/api/yt_mp3?video_id=${videoId}`,
+      options
+    );
 
-    // Get only audio formats and sort by quality
-    const audioFormats = ytdl
-      .filterFormats(info.formats, 'audioonly')
-      .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
-
-    if (!audioFormats.length) {
-      throw new Error('No audio formats found');
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`RapidAPI request failed: ${error}`);
     }
 
-    // Choose the first (highest quality) format
-    const format = audioFormats[0];
-    console.log('Selected audio format:', format.qualityLabel || format.audioQuality);
+    const data = await response.json();
+
+    if (!data.success || !data.url) {
+      throw new Error('Failed to get audio URL from API');
+    }
+
+    // Download the audio file from the provided URL
+    const audioResponse = await fetch(data.url);
+    if (!audioResponse.ok) {
+      throw new Error('Failed to download audio file');
+    }
+
+    // Create write stream
+    const fileStream = fs.createWriteStream(outputPath);
 
     return new Promise<string>((resolve, reject) => {
-      const stream = ytdl.downloadFromInfo(info, {
-        format: format,
-        agent,
-        requestOptions: { headers },
-      });
-
       let error: Error | null = null;
       let dataReceived = false;
 
-      // Set up error handling for the stream
       const handleError = (err: Error) => {
         error = err;
         console.error('Stream error:', err);
-        stream.destroy();
         fileStream.destroy();
         if (fs.existsSync(outputPath)) {
           fs.unlinkSync(outputPath);
@@ -141,47 +126,65 @@ export async function downloadAudio(videoId: string): Promise<string> {
         reject(err);
       };
 
-      stream.on('error', handleError);
       fileStream.on('error', handleError);
 
-      stream.on('data', (chunk) => {
-        dataReceived = true;
-      });
+      if (audioResponse.body) {
+        const readable = new Readable({
+          read() {
+            // This function is required but can be empty
+          },
+        });
 
-      stream.pipe(fileStream);
+        const stream = audioResponse.body.getReader();
 
-      fileStream.on('finish', () => {
-        if (error) return;
+        // Start the streaming process
+        streamToReadable(stream, readable).catch(handleError);
 
-        if (!dataReceived) {
-          handleError(new Error('No data received from stream'));
-          return;
-        }
+        readable.on('data', () => {
+          dataReceived = true;
+        });
 
-        try {
-          const stats = fs.statSync(outputPath);
-          if (stats.size === 0) {
-            handleError(new Error('Downloaded file is empty'));
+        readable.on('end', () => {
+          if (!dataReceived) {
+            handleError(new Error('No data received from stream'));
             return;
           }
 
-          console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
-          resolve(outputPath);
-        } catch (err) {
-          handleError(err as Error);
-        }
-      });
+          try {
+            const stats = fs.statSync(outputPath);
+            if (stats.size === 0) {
+              handleError(new Error('Downloaded file is empty'));
+              return;
+            }
 
-      // Add timeout
-      const timeout = setTimeout(() => {
-        if (!dataReceived) {
-          handleError(new Error('Download timeout after 30 seconds'));
-        }
-      }, 30000);
+            console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
+            resolve(outputPath);
+          } catch (err) {
+            handleError(err as Error);
+          }
+        });
 
-      // Clear timeout if stream ends or errors
-      stream.on('end', () => clearTimeout(timeout));
-      stream.on('error', () => clearTimeout(timeout));
+        readable.on('error', (err) => {
+          handleError(err instanceof Error ? err : new Error(String(err)));
+        });
+
+        // Pipe the converted stream to file
+        readable.pipe(fileStream);
+
+        // Add timeout
+        const timeout = setTimeout(() => {
+          if (!dataReceived) {
+            stream.cancel();
+            readable.destroy();
+            handleError(new Error('Download timeout after 30 seconds'));
+          }
+        }, 30000);
+
+        readable.on('end', () => clearTimeout(timeout));
+        readable.on('error', () => clearTimeout(timeout));
+      } else {
+        handleError(new Error('No response body available'));
+      }
     });
   } catch (error) {
     // Cleanup on error
@@ -201,7 +204,6 @@ export async function downloadAudio(videoId: string): Promise<string> {
       cwd: process.cwd(),
       outputPath,
       videoId,
-      cookies: process.env.YOUTUBE_COOKIES ? 'Present' : 'Missing',
     });
     throw new Error(
       `Failed to download audio: ${error instanceof Error ? error.message : String(error)}`
