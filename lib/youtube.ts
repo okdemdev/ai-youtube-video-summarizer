@@ -49,43 +49,26 @@ export interface VideoMetadata {
   publishedAt: string;
 }
 
-// Add this cookie helper function at the top
 function createCookieAgent() {
-  // Get cookies from environment variables
-  const cookies = [
-    {
-      name: 'CONSENT',
-      value: 'YES+1',
-      domain: '.youtube.com',
-      path: '/',
-    },
-    {
-      name: 'LOGIN_INFO',
-      value: process.env.YT_LOGIN_INFO || '',
-      domain: '.youtube.com',
-      path: '/',
-    },
-    {
-      name: 'HSID',
-      value: process.env.YT_HSID || '',
-      domain: '.youtube.com',
-      path: '/',
-    },
-    {
-      name: 'SSID',
-      value: process.env.YT_SSID || '',
-      domain: '.youtube.com',
-      path: '/',
-    },
-    {
-      name: 'SID',
-      value: process.env.YT_SID || '',
-      domain: '.youtube.com',
-      path: '/',
-    },
-  ].filter((cookie) => cookie.value); // Only include cookies that have values
+  const cookieString = process.env.YOUTUBE_COOKIES;
+  if (!cookieString) {
+    console.warn('No YouTube cookies found in environment variables');
+    return undefined;
+  }
 
-  return ytdl.createAgent(cookies);
+  // Parse cookie string into array of cookie objects
+  const cookieObjects = cookieString.split(';').map((cookie) => {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    const value = valueParts.join('='); // Rejoin in case value contains =
+    return {
+      name: name.trim(),
+      value: value.trim(),
+      domain: '.youtube.com',
+      path: '/',
+    };
+  });
+
+  return ytdl.createAgent(cookieObjects);
 }
 
 export async function downloadAudio(videoId: string): Promise<string> {
@@ -94,19 +77,20 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    // Create agent with cookies
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const agent = createCookieAgent();
 
     // Create write stream before starting download
     const fileStream = fs.createWriteStream(outputPath);
 
-    // Get video info with agent
-    const info = await ytdl.getInfo(videoId, {
+    // Get video info with cookies
+    const info = await ytdl.getInfo(videoUrl, {
       agent,
       requestOptions: {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Cookie: process.env.YOUTUBE_COOKIES || '',
         },
       },
     });
@@ -148,12 +132,14 @@ export async function downloadAudio(videoId: string): Promise<string> {
       stream.on('error', (err: Error) => {
         error = err;
         console.error('Download stream error:', err);
+        fileStream.destroy();
         reject(err);
       });
 
       fileStream.on('error', (err: Error) => {
         error = err;
         console.error('Write stream error:', err);
+        stream.destroy();
         reject(err);
       });
 
@@ -178,6 +164,7 @@ export async function downloadAudio(videoId: string): Promise<string> {
       setTimeout(() => {
         if (!dataReceived) {
           stream.destroy();
+          fileStream.destroy();
           reject(new Error('Download timeout after 30 seconds'));
         }
       }, 30000);
