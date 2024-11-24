@@ -78,17 +78,20 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
+    const url = `https://${process.env.RAPIDAPI_HOST}/download`;
+
     const options = {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'X-RapidAPI-Key': process.env.RAPIDAPI_KEY!,
         'X-RapidAPI-Host': process.env.RAPIDAPI_HOST!,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        format: 'mp3',
+      }),
     };
-
-    const url = `https://${process.env.RAPIDAPI_HOST}/api/dl?url=${encodeURIComponent(
-      `https://www.youtube.com/watch?v=${videoId}`
-    )}`;
 
     console.log('Making RapidAPI request to:', url);
     const response = await fetch(url, options);
