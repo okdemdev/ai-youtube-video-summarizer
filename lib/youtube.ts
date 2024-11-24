@@ -13,8 +13,17 @@ const getYoutubeClient = () => {
         scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
       }),
     });
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // Development: Use credentials file
+    return google.youtube({
+      version: 'v3',
+      auth: new google.auth.GoogleAuth({
+        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+      }),
+    });
   } else {
-    // Development: Use API key directly
+    // Fallback: Use API key directly
     return google.youtube('v3');
   }
 };
