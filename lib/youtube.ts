@@ -5,37 +5,55 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { google } from 'googleapis';
-import https from 'https';
-import { Readable } from 'stream';
+import { spawn } from 'child_process';
 
 const execAsync = promisify(exec);
-let speechClient: SpeechClient;
+let speechClient: SpeechClient | null = null;
 
-try {
-  // Initialize with credentials from environment variable only
-  if (!process.env.GOOGLE_CREDENTIALS) {
-    throw new Error('GOOGLE_CREDENTIALS environment variable is not set');
+async function initSpeechClient() {
+  if (speechClient) return speechClient;
+
+  try {
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!credentialsPath) {
+      throw new Error('GOOGLE_APPLICATION_CREDENTIALS environment variable is not set');
+    }
+
+    // Use path.resolve to get absolute path
+    const absolutePath = path.resolve(process.cwd(), credentialsPath);
+    console.log('Loading credentials from:', absolutePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new Error(`Credentials file not found at ${absolutePath}`);
+    }
+
+    // Read credentials from file
+    const credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
+    console.log('Initializing Speech Client with project ID:', credentials.project_id);
+
+    speechClient = new SpeechClient({
+      credentials: {
+        client_email: credentials.client_email,
+        private_key: credentials.private_key,
+      },
+      projectId: credentials.project_id,
+    });
+
+    console.log('Speech Client initialized successfully');
+    return speechClient;
+  } catch (error) {
+    console.error('Error initializing Speech Client:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cwd: process.cwd(),
+      credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    });
+    throw error;
   }
-
-  const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-  console.log('Initializing Speech Client with project ID:', credentials.project_id);
-
-  speechClient = new SpeechClient({
-    credentials,
-    projectId: credentials.project_id,
-  });
-
-  console.log('Speech Client initialized successfully');
-} catch (error) {
-  console.error('Error initializing Speech Client:', {
-    error,
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
-    hasCredentials: !!process.env.GOOGLE_CREDENTIALS,
-  });
 }
 
-const MAX_CHUNK_DURATION = 45; // seconds
+const MAX_CHUNK_DURATION = 45;
 const youtube = google.youtube('v3');
 
 export interface VideoMetadata {
@@ -49,149 +67,55 @@ export interface VideoMetadata {
   publishedAt: string;
 }
 
-// Add this helper function outside the main function
-async function streamToReadable(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  readable: Readable
-) {
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        readable.push(null); // Signal the end of the stream
-        break;
-      }
-      if (!readable.push(value)) {
-        await new Promise((resolve) => readable.once('drain', resolve));
-      }
-    }
-  } catch (err) {
-    readable.destroy(
-      new Error(`Stream reading error: ${err instanceof Error ? err.message : String(err)}`)
-    );
-  }
-}
-
 export async function downloadAudio(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   try {
     console.log('Downloading audio for video:', videoId);
 
-    const url = `https://${process.env.RAPIDAPI_HOST}/download`;
+    // Use yt-dlp to download audio with mono channel
+    const ytDlpProcess = spawn('yt-dlp', [
+      '--extract-audio',
+      '--audio-format',
+      'wav',
+      '--audio-quality',
+      '0',
+      '--postprocessor-args',
+      '-ac 1', // Convert to mono
+      '--output',
+      outputPath,
+      videoUrl,
+    ]);
 
-    const options = {
-      method: 'POST',
-      headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY!,
-        'X-RapidAPI-Host': process.env.RAPIDAPI_HOST!,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        format: 'mp3',
-      }),
-    };
+    return new Promise((resolve, reject) => {
+      ytDlpProcess.stderr.on('data', (data) => {
+        console.log(`yt-dlp stderr: ${data}`);
+      });
 
-    console.log('Making RapidAPI request to:', url);
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`RapidAPI request failed: ${error}`);
-    }
-
-    const data = await response.json();
-    console.log('RapidAPI response:', data);
-
-    if (!data.url) {
-      throw new Error('Failed to get audio URL from API');
-    }
-
-    const audioResponse = await fetch(data.url);
-    if (!audioResponse.ok) {
-      throw new Error('Failed to download audio file');
-    }
-
-    // Create write stream
-    const fileStream = fs.createWriteStream(outputPath);
-
-    return new Promise<string>((resolve, reject) => {
-      let error: Error | null = null;
-      let dataReceived = false;
-
-      const handleError = (err: Error) => {
-        error = err;
-        console.error('Stream error:', err);
-        fileStream.destroy();
-        if (fs.existsSync(outputPath)) {
-          fs.unlinkSync(outputPath);
-        }
-        reject(err);
-      };
-
-      fileStream.on('error', handleError);
-
-      if (audioResponse.body) {
-        const readable = new Readable({
-          read() {
-            // This function is required but can be empty
-          },
-        });
-
-        const stream = audioResponse.body.getReader();
-
-        // Start the streaming process
-        streamToReadable(stream, readable).catch(handleError);
-
-        readable.on('data', () => {
-          dataReceived = true;
-        });
-
-        readable.on('end', () => {
-          if (!dataReceived) {
-            handleError(new Error('No data received from stream'));
-            return;
-          }
-
-          try {
+      ytDlpProcess.on('close', (code) => {
+        if (code === 0) {
+          if (fs.existsSync(outputPath)) {
             const stats = fs.statSync(outputPath);
-            if (stats.size === 0) {
-              handleError(new Error('Downloaded file is empty'));
-              return;
+            if (stats.size > 0) {
+              console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
+              resolve(outputPath);
+            } else {
+              reject(new Error('Downloaded file is empty'));
             }
-
-            console.log('Audio file created successfully at:', outputPath, 'Size:', stats.size);
-            resolve(outputPath);
-          } catch (err) {
-            handleError(err as Error);
+          } else {
+            reject(new Error('Output file not found'));
           }
-        });
+        } else {
+          reject(new Error(`yt-dlp process exited with code ${code}`));
+        }
+      });
 
-        readable.on('error', (err) => {
-          handleError(err instanceof Error ? err : new Error(String(err)));
-        });
-
-        // Pipe the converted stream to file
-        readable.pipe(fileStream);
-
-        // Add timeout
-        const timeout = setTimeout(() => {
-          if (!dataReceived) {
-            stream.cancel();
-            readable.destroy();
-            handleError(new Error('Download timeout after 30 seconds'));
-          }
-        }, 30000);
-
-        readable.on('end', () => clearTimeout(timeout));
-        readable.on('error', () => clearTimeout(timeout));
-      } else {
-        handleError(new Error('No response body available'));
-      }
+      ytDlpProcess.on('error', (err) => {
+        reject(new Error(`Failed to start yt-dlp: ${err.message}`));
+      });
     });
   } catch (error) {
-    // Cleanup on error
     if (fs.existsSync(outputPath)) {
       try {
         fs.unlinkSync(outputPath);
@@ -216,11 +140,12 @@ export async function downloadAudio(videoId: string): Promise<string> {
 }
 
 export async function transcribeAudio(audioPath: string): Promise<string> {
-  if (!speechClient) {
-    throw new Error('Speech client not initialized');
-  }
-
   try {
+    const client = await initSpeechClient();
+    if (!client) {
+      throw new Error('Failed to initialize speech client');
+    }
+
     if (!fs.existsSync(audioPath)) {
       throw new Error(`Audio file not found at ${audioPath}`);
     }
@@ -231,12 +156,12 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
 
     const config = {
       encoding: 'LINEAR16' as const,
-      sampleRateHertz: 16000,
+      sampleRateHertz: 48000,
       languageCode: 'en-US',
     };
 
     const audioLength = audio.length;
-    const chunkSize = MAX_CHUNK_DURATION * 16000 * 2; // 2 bytes per sample
+    const chunkSize = MAX_CHUNK_DURATION * 48000 * 2;
     const chunks: Buffer[] = [];
 
     // Split audio into chunks
@@ -259,7 +184,7 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
       };
 
       try {
-        const [response] = await speechClient.recognize(request);
+        const [response] = await client.recognize(request);
         const transcription = response.results
           ?.map((result) => result.alternatives?.[0]?.transcript)
           .join('\n');
@@ -280,17 +205,12 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
       }
     }
 
-    // Cleanup
+    // Cleanup the audio file
     try {
       fs.unlinkSync(audioPath);
       console.log('Cleaned up audio file:', audioPath);
-    } catch (error) {
-      console.error('Error cleaning up audio file:', {
-        error,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        path: audioPath,
-      });
+    } catch (cleanupError) {
+      console.error('Error cleaning up audio file:', cleanupError);
     }
 
     return fullTranscript.trim();

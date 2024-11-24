@@ -1,6 +1,0 @@
-{
-  "buildCommand": "npm run build",
-  "installCommand": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp && chmod +x bin/yt-dlp && npm install",
-  "framework": "nextjs",
-  "regions": ["fra1"]
-}

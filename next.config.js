@@ -9,7 +9,7 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
-    domains: ['i.ytimg.com', 'img.youtube.com', 'youtube.com', 'youtube-to-mp315.p.rapidapi.com'],
+    domains: ['i.ytimg.com', 'img.youtube.com', 'youtube.com'],
   },
 };
 
