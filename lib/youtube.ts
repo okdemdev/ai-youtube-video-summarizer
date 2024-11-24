@@ -88,7 +88,7 @@ export async function downloadAudio(videoId: string): Promise<string> {
     };
 
     const response = await fetch(
-      `https://${process.env.RAPIDAPI_HOST}/youtube/audio/${videoId}`,
+      `https://${process.env.RAPIDAPI_HOST}/api/dl?id=${videoId}`,
       options
     );
 
