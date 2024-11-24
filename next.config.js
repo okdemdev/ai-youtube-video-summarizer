@@ -7,10 +7,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: {
-    unoptimized: true,
-    domains: ['i.ytimg.com', 'img.youtube.com', 'youtube.com'],
-  },
 };
 
 module.exports = nextConfig;
