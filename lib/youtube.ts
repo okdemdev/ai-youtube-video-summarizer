@@ -49,38 +49,61 @@ export interface VideoMetadata {
   publishedAt: string;
 }
 
+// Add this cookie helper function at the top
+function createCookieAgent() {
+  // Get cookies from environment variables
+  const cookies = [
+    {
+      name: 'CONSENT',
+      value: 'YES+1',
+      domain: '.youtube.com',
+      path: '/',
+    },
+    {
+      name: 'LOGIN_INFO',
+      value: process.env.YT_LOGIN_INFO || '',
+      domain: '.youtube.com',
+      path: '/',
+    },
+    {
+      name: 'HSID',
+      value: process.env.YT_HSID || '',
+      domain: '.youtube.com',
+      path: '/',
+    },
+    {
+      name: 'SSID',
+      value: process.env.YT_SSID || '',
+      domain: '.youtube.com',
+      path: '/',
+    },
+    {
+      name: 'SID',
+      value: process.env.YT_SID || '',
+      domain: '.youtube.com',
+      path: '/',
+    },
+  ].filter((cookie) => cookie.value); // Only include cookies that have values
+
+  return ytdl.createAgent(cookies);
+}
+
 export async function downloadAudio(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.wav`);
 
   try {
     console.log('Downloading audio for video:', videoId);
 
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const writeStream = fs.createWriteStream(outputPath);
+    // Create agent with cookies
+    const agent = createCookieAgent();
 
-    // Add more required cookies
-    const cookieString = [
-      `LOGIN_INFO=${process.env.YT_LOGIN_INFO || ''}`,
-      `HSID=${process.env.YT_HSID || ''}`,
-      `SSID=${process.env.YT_SSID || ''}`,
-      `SID=${process.env.YT_SID || ''}`,
-      'CONSENT=YES+1',
-      'GPS=1',
-      'VISITOR_INFO1_LIVE=yes',
-      'YSC=yes',
-    ].join('; ');
-
-    // First get info with cookies
+    // Get video info with agent
     const info = await ytdl.getInfo(videoId, {
+      agent,
       requestOptions: {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Cookie: cookieString,
-          'x-youtube-identity-token': process.env.YT_LOGIN_INFO?.split(':')[0] || '',
-          Accept: '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          Connection: 'keep-alive',
         },
       },
     });
@@ -101,12 +124,11 @@ export async function downloadAudio(videoId: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const stream = ytdl.downloadFromInfo(info, {
         format: format,
+        agent, // Use the same agent for download
         requestOptions: {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Cookie: cookieString,
-            'x-youtube-identity-token': process.env.YT_LOGIN_INFO?.split(':')[0] || '',
           },
         },
       });
