@@ -78,19 +78,20 @@ export async function downloadAudio(videoId: string): Promise<string> {
   try {
     console.log('Downloading audio for video:', videoId);
 
-    // First, request the audio URL from RapidAPI
     const options = {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'X-RapidAPI-Key': process.env.RAPIDAPI_KEY!,
         'X-RapidAPI-Host': process.env.RAPIDAPI_HOST!,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        format: 'mp3',
+      }),
     };
 
-    const response = await fetch(
-      `https://${process.env.RAPIDAPI_HOST}/api/dl?id=${videoId}`,
-      options
-    );
+    const response = await fetch(`https://${process.env.RAPIDAPI_HOST}/download`, options);
 
     if (!response.ok) {
       const error = await response.text();
@@ -98,13 +99,14 @@ export async function downloadAudio(videoId: string): Promise<string> {
     }
 
     const data = await response.json();
+    console.log('RapidAPI response:', data);
 
-    if (!data.success || !data.url) {
+    if (!data.link) {
       throw new Error('Failed to get audio URL from API');
     }
 
-    // Download the audio file from the provided URL
-    const audioResponse = await fetch(data.url);
+    // Download the audio file from the provided link
+    const audioResponse = await fetch(data.link);
     if (!audioResponse.ok) {
       throw new Error('Failed to download audio file');
     }
