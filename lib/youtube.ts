@@ -46,7 +46,7 @@ export async function transcribeVideo(videoId: string): Promise<string> {
     console.log('Requesting transcription for video:', videoId);
 
     const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
-    const url = `https://youtube-transcripts.p.rapidapi.com/youtube/transcript?url=${youtubeUrl}`;
+    const url = `https://youtube-transcripts.p.rapidapi.com/youtube/transcript`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -54,6 +54,8 @@ export async function transcribeVideo(videoId: string): Promise<string> {
         'x-rapidapi-key': RAPID_API_KEY,
         'x-rapidapi-host': 'youtube-transcripts.p.rapidapi.com',
       },
+      cache: 'no-store',
+      next: { revalidate: 0 },
     });
 
     if (!response.ok) {
@@ -63,24 +65,31 @@ export async function transcribeVideo(videoId: string): Promise<string> {
     }
 
     const data = await response.json();
-    console.log('API Response data:', data);
+    console.log('Raw API Response:', data);
 
-    if (!data || !data.content || !Array.isArray(data.content)) {
+    if (!Array.isArray(data)) {
       throw new Error('Invalid response format from API');
     }
 
-    const transcript = data.content
-      .map((segment: { text: string; offset: number; duration: number }) => segment.text)
+    const transcript = data
+      .map((segment: { text: string; duration: number; offset: number }) => segment.text)
       .join(' ');
 
-    if (!transcript) {
-      throw new Error('No transcript available for this video');
+    if (!transcript.trim()) {
+      throw new Error(
+        'No transcript available for this video. Please try a different video that has closed captions enabled.'
+      );
     }
 
     return transcript;
   } catch (error) {
     console.error('Error transcribing video:', error);
-    throw new Error('Failed to transcribe video');
+    if (error instanceof Error) {
+      throw error; // Preserve the original error message
+    }
+    throw new Error(
+      'Failed to transcribe video. Please ensure the video has closed captions available.'
+    );
   }
 }
 
